@@ -6,6 +6,8 @@
 	let { data } = $props();
 	let queue = $state<any[]>([]);
 	let actionError = $state('');
+	let selectedItem = $state<any | null>(null);
+	let selectedImage = $state<string | null>(null);
 	const summary = $derived({
 		total: queue.length,
 		withEvidence: queue.filter((q) => (q.submission?.photo_data_urls?.length ?? 0) > 0 || q.submission?.photo_data_url).length,
@@ -53,6 +55,7 @@
 		}
 		actionError = '';
 		queue = queue.filter((entry: any) => entry.id !== item.id);
+		if (selectedItem?.id === item.id) selectedItem = null;
 	};
 
 	const onResetQuiz = async (item: any, notes = '', checklist_results: any[] = []) => {
@@ -74,6 +77,7 @@
 		}
 		actionError = '';
 		queue = queue.filter((entry: any) => entry.id !== item.id);
+		if (selectedItem?.id === item.id) selectedItem = null;
 	};
 
 	const onRetryCheckoff = async (item: any, notes = '', checklist_results: any[] = []) => {
@@ -96,9 +100,60 @@
 		actionError = '';
 		queue = queue.map((entry: any) =>
 			entry.id === item.id
-				? { ...entry, review: { ...(entry.review ?? {}), status: 'needs_review', mentor_notes: notes } }
+				? {
+						...entry,
+						derivedCheckoffStatus: 'needs_review',
+						review: {
+							...(entry.review ?? {}),
+							status: 'needs_review',
+							mentor_notes: notes,
+							checklist_results,
+							updated_at: new Date().toISOString()
+						}
+					}
 				: entry
 		);
+		if (selectedItem?.id === item.id) {
+			selectedItem = queue.find((entry: any) => entry.id === item.id) ?? selectedItem;
+		}
+	};
+
+	const onBlockCheckoff = async (item: any, notes = '', checklist_results: any[] = []) => {
+		const res = await fetch('/api/mentor/checkoff', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				nodeId: item.node_id,
+				userId: item.user_id,
+				action: 'block_checkoff',
+				notes,
+				checklist_results
+			})
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => null);
+			actionError = body?.error ?? 'Could not block checkoff.';
+			return;
+		}
+		actionError = '';
+		queue = queue.map((entry: any) =>
+			entry.id === item.id
+				? {
+						...entry,
+						derivedCheckoffStatus: 'blocked',
+						review: {
+							...(entry.review ?? {}),
+							status: 'blocked',
+							mentor_notes: notes,
+							checklist_results,
+							updated_at: new Date().toISOString()
+						}
+					}
+				: entry
+		);
+		if (selectedItem?.id === item.id) {
+			selectedItem = queue.find((entry: any) => entry.id === item.id) ?? selectedItem;
+		}
 	};
 </script>
 
@@ -160,8 +215,56 @@
 	{:else}
 		<div class="grid gap-3 md:grid-cols-2">
 			{#each queue as item}
-				<CheckoffCard {item} {onApprove} onReview={onResetQuiz} onRetryCheckoff={onRetryCheckoff} />
+				<CheckoffCard
+					{item}
+					{onApprove}
+					onReview={onResetQuiz}
+					onRetryCheckoff={onRetryCheckoff}
+					{onBlockCheckoff}
+					onOpen={(next: any) => (selectedItem = next)}
+					onImageOpen={(url: string) => (selectedImage = url)}
+				/>
 			{/each}
+		</div>
+	{/if}
+
+	{#if selectedItem}
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+			<div class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-slate-700 bg-slate-950 p-4">
+				<div class="mb-3 flex items-center justify-between">
+					<h2 class="text-lg font-semibold">Full Review</h2>
+					<button class="rounded border border-slate-700 px-3 py-1 text-sm" onclick={() => (selectedItem = null)}
+						>Close</button
+					>
+				</div>
+				<CheckoffCard
+					item={selectedItem}
+					{onApprove}
+					onReview={onResetQuiz}
+					onRetryCheckoff={onRetryCheckoff}
+					{onBlockCheckoff}
+					onOpen={() => {}}
+					onImageOpen={(url: string) => (selectedImage = url)}
+				/>
+			</div>
+		</div>
+	{/if}
+
+	{#if selectedImage}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+			role="button"
+			tabindex="0"
+			onclick={() => (selectedImage = null)}
+			onkeydown={(event) => {
+				if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') selectedImage = null;
+			}}
+		>
+			<img
+				src={selectedImage}
+				alt="Submission evidence full screen"
+				class="max-h-full max-w-full object-contain"
+			/>
 		</div>
 	{/if}
 </section>

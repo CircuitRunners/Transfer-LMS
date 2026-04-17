@@ -97,6 +97,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		submission: submissionByPair.get(`${item.user_id}:${item.node_id}`) ?? null,
 		review: reviewByPair.get(`${item.user_id}:${item.node_id}`) ?? null
 	}));
+	queue = queue.map((item: any) => {
+		const derivedCheckoffStatus = item.review?.status
+			? item.review.status
+			: item.submission
+				? 'submitted'
+				: 'not_submitted';
+		return { ...item, derivedCheckoffStatus };
+	});
 
 	const shouldFilterMine = scope === 'mine' && mentorTeamIds.length > 0;
 	if (shouldFilterMine) {

@@ -34,6 +34,16 @@
 	const videoId = $derived(extractVideoId(data.node.video_url ?? ''));
 
 	const certStatus = $derived(data.certStatus as string);
+	const reviewStatus = $derived((data.review?.status as string | undefined) ?? '');
+	const effectiveStatus = $derived.by(() => {
+		if (certStatus === 'mentor_checkoff_pending' && reviewStatus === 'needs_review') {
+			return 'checkoff_needs_review';
+		}
+		if (certStatus === 'mentor_checkoff_pending' && reviewStatus === 'blocked') {
+			return 'checkoff_blocked';
+		}
+		return certStatus;
+	});
 	const videoDone = $derived(
 		certStatus === 'quiz_pending' ||
 			certStatus === 'mentor_checkoff_pending' ||
@@ -66,10 +76,12 @@
 		video_pending: { label: 'Video in progress', tone: 'slate' },
 		quiz_pending: { label: 'Quiz unlocked', tone: 'yellow' },
 		mentor_checkoff_pending: { label: 'Awaiting mentor checkoff', tone: 'sky' },
+		checkoff_needs_review: { label: 'Action required: redo checkoff', tone: 'yellow' },
+		checkoff_blocked: { label: 'Blocked by mentor', tone: 'red' },
 		completed: { label: 'Completed', tone: 'emerald' }
 	};
 	const statusInfo = $derived(
-		statusLabels[certStatus] ?? { label: certStatus, tone: 'slate' }
+		statusLabels[effectiveStatus] ?? { label: effectiveStatus, tone: 'slate' }
 	);
 
 	const initialSubmissionPhotos = $derived.by(() => {
@@ -90,6 +102,23 @@
 		Array.isArray(data.checkoff?.resource_links) ? data.checkoff.resource_links : []
 	);
 	const showCheckoffSection = $derived(videoDone && (awaitingMentor || completed));
+	const blockedByMentor = $derived(data.review?.status === 'blocked' && awaitingMentor);
+	const allowQuizSubmit = $derived(certStatus === 'quiz_pending');
+	const quizLockedMessage = $derived.by(() => {
+		if (effectiveStatus === 'checkoff_needs_review') {
+			return 'Quiz is already passed. Action required: redo your checkoff based on mentor feedback.';
+		}
+		if (effectiveStatus === 'checkoff_blocked') {
+			return 'Quiz is passed, but checkoff is blocked until mentor concerns are resolved.';
+		}
+		if (certStatus === 'mentor_checkoff_pending') {
+			return 'Quiz is already passed. Awaiting mentor checkoff.';
+		}
+		if (certStatus === 'completed') {
+			return 'Quiz and checkoff completed.';
+		}
+		return '';
+	});
 
 	async function compressImage(file: File): Promise<string> {
 		const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -151,6 +180,8 @@
 				class={`inline-flex rounded-full px-2 py-0.5 ${
 					statusInfo.tone === 'emerald'
 						? 'bg-emerald-900/40 text-emerald-200'
+						: statusInfo.tone === 'red'
+							? 'bg-red-900/40 text-red-200'
 						: statusInfo.tone === 'sky'
 							? 'bg-sky-900/40 text-sky-200'
 							: statusInfo.tone === 'yellow'
@@ -206,26 +237,6 @@
 		</div>
 	{/if}
 
-	{#if videoDone && !completed && !awaitingMentor}
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-lg font-semibold">Quiz</h2>
-				<span class="text-xs text-slate-400">Passing score: {data.passingScore}%</span>
-			</div>
-			{#if (data.questions ?? []).length === 0}
-				<p class="text-sm text-slate-400">
-					No quiz is configured for this module. Ask a mentor to add one.
-				</p>
-			{:else}
-				<Quiz
-					questions={data.questions}
-					nodeId={data.node.id}
-					passingScore={data.passingScore}
-				/>
-			{/if}
-		</div>
-	{/if}
-
 	{#if showCheckoffSection}
 		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 			<div class="mb-3">
@@ -277,6 +288,11 @@
 				}}
 				class="space-y-3 rounded border border-slate-800 bg-slate-950/60 p-3"
 			>
+				{#if blockedByMentor}
+					<p class="rounded border border-red-700 bg-red-900/20 p-2 text-xs text-red-200">
+						This checkoff is currently blocked by a mentor. Resolve the feedback before further review.
+					</p>
+				{/if}
 				<label class="flex flex-col gap-1 text-sm">
 					<span class="text-slate-300">What did you complete?</span>
 					<textarea
@@ -284,6 +300,7 @@
 						rows="3"
 						class="rounded bg-slate-800 px-2 py-2"
 						placeholder="Describe what you built/demonstrated, tools used, and any issues."
+						disabled={blockedByMentor}
 					>{data.submission?.notes ?? ''}</textarea>
 				</label>
 				<label class="flex flex-col gap-1 text-sm">
@@ -298,6 +315,7 @@
 						capture="environment"
 						multiple
 						onchange={onPhotoSelected}
+						disabled={blockedByMentor}
 					/>
 					<input type="hidden" name="photo_data_urls_json" value={JSON.stringify(uploadPreviews)} />
 				</label>
@@ -324,8 +342,12 @@
 				{#if checkoffMessage}
 					<p class="text-xs text-slate-300">{checkoffMessage}</p>
 				{/if}
-				<button class="rounded bg-yellow-400 px-3 py-2 text-sm font-semibold text-slate-900" type="submit">
-					Save checkoff submission
+				<button
+					class="rounded bg-yellow-400 px-3 py-2 text-sm font-semibold text-slate-900 disabled:opacity-60"
+					type="submit"
+					disabled={blockedByMentor}
+				>
+					{blockedByMentor ? 'Blocked by mentor' : 'Save checkoff submission'}
 				</button>
 			</form>
 			{#if data.review}
@@ -337,6 +359,11 @@
 							Mentor requested updates. Your current submission stays saved; update notes/photos and save again.
 						</p>
 					{/if}
+					{#if data.review.status === 'blocked'}
+						<p class="mt-2 text-xs text-red-200">
+							Mentor has blocked this checkoff pending safety/compliance resolution.
+						</p>
+					{/if}
 					{#if (data.review.checklist_results ?? []).length > 0}
 						<ul class="mt-2 list-disc pl-5 text-xs text-slate-300">
 							{#each data.review.checklist_results as row}
@@ -345,6 +372,28 @@
 						</ul>
 					{/if}
 				</div>
+			{/if}
+		</div>
+	{/if}
+
+	{#if videoDone}
+		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+			<div class="mb-3 flex items-center justify-between">
+				<h2 class="text-lg font-semibold">Quiz</h2>
+				<span class="text-xs text-slate-400">Passing score: {data.passingScore}%</span>
+			</div>
+			{#if (data.questions ?? []).length === 0}
+				<p class="text-sm text-slate-400">
+					No quiz is configured for this module. Ask a mentor to add one.
+				</p>
+			{:else}
+				<Quiz
+					questions={data.questions}
+					nodeId={data.node.id}
+					passingScore={data.passingScore}
+					allowSubmit={allowQuizSubmit}
+					lockedMessage={quizLockedMessage}
+				/>
 			{/if}
 		</div>
 	{/if}

@@ -1,7 +1,7 @@
 <script lang="ts">
-	let { item, onApprove, onReview, onRetryCheckoff } = $props();
+	let { item, onApprove, onReview, onRetryCheckoff, onBlockCheckoff, onOpen, onImageOpen } = $props();
 
-	let busy = $state<'' | 'approve' | 'review' | 'retry'>('');
+	let busy = $state<'' | 'approve' | 'review' | 'retry' | 'block'>('');
 	let notes = $state('');
 	let checklistStates = $state<Record<string, boolean>>({});
 
@@ -68,15 +68,71 @@
 			busy = '';
 		}
 	}
+
+	async function blockCheckoff() {
+		if (busy) return;
+		const ok = confirm(
+			`Block this checkoff for ${item.profile?.full_name || item.profile?.email}? Use this for safety or major compliance issues.`
+		);
+		if (!ok) return;
+		busy = 'block';
+		try {
+			const checklist_results = Object.entries(checklistStates).map(([item, passed]) => ({ item, passed }));
+			await onBlockCheckoff(item, notes.trim(), checklist_results);
+		} finally {
+			busy = '';
+		}
+	}
+
+	const statusToneClass = $derived.by(() => {
+		switch (item.derivedCheckoffStatus) {
+			case 'approved':
+				return 'bg-emerald-900/40 text-emerald-200';
+			case 'blocked':
+				return 'bg-red-900/40 text-red-200';
+			case 'needs_review':
+				return 'bg-amber-900/40 text-amber-200';
+			case 'submitted':
+				return 'bg-sky-900/40 text-sky-200';
+			default:
+				return 'bg-slate-800 text-slate-300';
+		}
+	});
+
+	const statusLabel = $derived.by(() => {
+		switch (item.derivedCheckoffStatus) {
+			case 'approved':
+				return 'approved';
+			case 'blocked':
+				return 'blocked';
+			case 'needs_review':
+				return 'needs review';
+			case 'submitted':
+				return 'awaiting checkoff';
+			default:
+				return 'not submitted';
+		}
+	});
 </script>
 
-<article class="space-y-2 rounded-lg border border-slate-700 bg-slate-900 p-3">
+<div
+	class="space-y-2 rounded-lg border border-slate-700 bg-slate-900 p-3 transition hover:border-slate-500"
+	role="button"
+	tabindex="0"
+	onclick={() => onOpen?.(item)}
+	onkeydown={(event) => {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			onOpen?.(item);
+		}
+	}}
+>
 	<div class="flex items-start justify-between gap-3">
 		<div>
 			<p class="font-semibold">{item.profile?.full_name || item.profile?.email}</p>
 			<p class="text-xs text-slate-400">{item.profile?.email}</p>
 		</div>
-		<span class="rounded-full bg-sky-900/40 px-2 py-0.5 text-xs text-sky-200">awaiting</span>
+		<span class={`rounded-full px-2 py-0.5 text-xs ${statusToneClass}`}>{statusLabel}</span>
 	</div>
 	<div>
 		<p class="text-sm font-medium text-slate-200">{item.node?.title}</p>
@@ -118,9 +174,9 @@
 				{#if photosFor(item.submission).length}
 					<div class="mt-2 grid grid-cols-3 gap-2">
 						{#each photosFor(item.submission) as photo}
-							<a href={photo} target="_blank" rel="noopener noreferrer">
+							<button type="button" onclick={(event) => { event.stopPropagation(); onImageOpen?.(photo); }}>
 								<img src={photo} alt="Student evidence" class="h-16 w-full rounded object-cover" />
-							</a>
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -149,24 +205,43 @@
 	<div class="flex flex-wrap gap-2 pt-1">
 		<button
 			class="rounded bg-emerald-600 px-3 py-1 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-60"
-			onclick={approve}
+			onclick={(event) => {
+				event.stopPropagation();
+				approve();
+			}}
 			disabled={!!busy}
 		>
 			{busy === 'approve' ? 'Approving…' : 'Approve'}
 		</button>
 		<button
 			class="rounded bg-amber-600 px-3 py-1 text-sm font-semibold hover:bg-amber-500 disabled:opacity-60"
-			onclick={review}
+			onclick={(event) => {
+				event.stopPropagation();
+				review();
+			}}
 			disabled={!!busy}
 		>
 			{busy === 'review' ? 'Resetting…' : 'Reset Quiz & Try Again'}
 		</button>
 		<button
 			class="rounded bg-slate-700 px-3 py-1 text-sm font-semibold hover:bg-slate-600 disabled:opacity-60"
-			onclick={retryCheckoff}
+			onclick={(event) => {
+				event.stopPropagation();
+				retryCheckoff();
+			}}
 			disabled={!!busy}
 		>
 			{busy === 'retry' ? 'Saving…' : 'Retry Checkoff (Keep Quiz)'}
 		</button>
+		<button
+			class="rounded bg-red-700 px-3 py-1 text-sm font-semibold hover:bg-red-600 disabled:opacity-60"
+			onclick={(event) => {
+				event.stopPropagation();
+				blockCheckoff();
+			}}
+			disabled={!!busy}
+		>
+			{busy === 'block' ? 'Blocking…' : 'Block Checkoff'}
+		</button>
 	</div>
-</article>
+</div>

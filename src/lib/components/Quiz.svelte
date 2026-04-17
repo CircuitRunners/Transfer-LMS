@@ -12,8 +12,16 @@
 	let {
 		questions,
 		nodeId,
-		passingScore = 80
-	}: { questions: Question[]; nodeId: string; passingScore?: number } = $props();
+		passingScore = 80,
+		allowSubmit = true,
+		lockedMessage = ''
+	}: {
+		questions: Question[];
+		nodeId: string;
+		passingScore?: number;
+		allowSubmit?: boolean;
+		lockedMessage?: string;
+	} = $props();
 
 	let answers = $state<Record<string, string>>({});
 	let submitting = $state(false);
@@ -95,7 +103,7 @@
 									checked={answers[question.id] === option}
 									onchange={() => (answers[question.id] = option)}
 									required
-									disabled={submitting}
+									disabled={submitting || !allowSubmit}
 								/>
 								<span>{option}</span>
 							</label>
@@ -119,7 +127,7 @@
 									checked={answers[question.id] === v}
 									onchange={() => (answers[question.id] = v)}
 									required
-									disabled={submitting}
+									disabled={submitting || !allowSubmit}
 								/>
 								{v === 'true' ? 'True' : 'False'}
 							</label>
@@ -132,7 +140,7 @@
 						bind:value={answers[question.id]}
 						placeholder="Your answer"
 						required
-						disabled={submitting}
+						disabled={submitting || !allowSubmit}
 					/>
 				{/if}
 			</fieldset>
@@ -142,12 +150,15 @@
 			<button
 				class="rounded bg-yellow-400 px-4 py-2 font-semibold text-slate-900 disabled:opacity-60"
 				type="submit"
-				disabled={submitting || unanswered > 0}
+				disabled={!allowSubmit || submitting || unanswered > 0}
 			>
-				{submitting ? 'Grading…' : result && !result.passed ? 'Resubmit' : 'Submit quiz'}
+				{!allowSubmit ? 'Quiz already passed' : submitting ? 'Grading…' : result && !result.passed ? 'Resubmit' : 'Submit quiz'}
 			</button>
 			{#if unanswered > 0}
 				<span class="text-xs text-slate-400">{unanswered} question(s) unanswered</span>
+			{/if}
+			{#if !allowSubmit}
+				<span class="text-xs text-slate-400">{lockedMessage || 'No resubmission needed right now.'}</span>
 			{/if}
 			{#if result && !result.passed}
 				<button

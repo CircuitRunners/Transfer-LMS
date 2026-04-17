@@ -8,7 +8,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const { nodeId, userId, action, notes, checklist_results } = await request.json();
 	const normalizedAction = action === 'review' ? 'reset_quiz' : action;
-	if (!nodeId || !userId || !['approve', 'reset_quiz', 'retry_checkoff'].includes(normalizedAction)) {
+	if (
+		!nodeId ||
+		!userId ||
+		!['approve', 'reset_quiz', 'retry_checkoff', 'block_checkoff'].includes(normalizedAction)
+	) {
 		return json({ error: 'Invalid request payload' }, { status: 400 });
 	}
 
@@ -30,11 +34,34 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			submission?.photo_data_url ||
 				(Array.isArray(submission?.photo_data_urls) && submission.photo_data_urls.length > 0)
 		);
+		if (!submission) {
+			return json({ error: 'Student must submit a checkoff record before approval.' }, { status: 400 });
+		}
 		if (requirement?.evidence_mode === 'photo_required' && !hasPhoto) {
 			return json(
 				{ error: 'Photo evidence is required before this checkoff can be approved.' },
 				{ status: 400 }
 			);
+		}
+		const requiredChecklist = Array.isArray(requirement?.mentor_checklist)
+			? requirement.mentor_checklist.map((v: unknown) => String(v))
+			: [];
+		if (requiredChecklist.length > 0) {
+			const checklistRows = Array.isArray(checklist_results) ? checklist_results : [];
+			const passedSet = new Set(
+				checklistRows
+					.filter((row: any) => row?.passed)
+					.map((row: any) => String(row?.item ?? ''))
+			);
+			const missing = requiredChecklist.filter((item) => !passedSet.has(item));
+			if (missing.length > 0) {
+				return json(
+					{
+						error: `Cannot approve until all mentor checklist items pass. Remaining: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`
+					},
+					{ status: 400 }
+				);
+			}
 		}
 	}
 
@@ -63,12 +90,32 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		if (error) return json({ error: error.message }, { status: 400 });
 	}
 
+	if (normalizedAction === 'retry_checkoff') {
+		await locals.supabase.from('checkoff_reviews').upsert(
+			{
+				user_id: userId,
+				node_id: nodeId,
+				reviewer_id: user.id,
+				status: 'needs_review',
+				mentor_notes: String(notes ?? ''),
+				checklist_results: Array.isArray(checklist_results) ? checklist_results : []
+			},
+			{ onConflict: 'user_id,node_id' }
+		);
+		return json({ ok: true, status: 'needs_review' });
+	}
+
 	await locals.supabase.from('checkoff_reviews').upsert(
 		{
 			user_id: userId,
 			node_id: nodeId,
 			reviewer_id: user.id,
-			status: normalizedAction === 'approve' ? 'approved' : 'needs_review',
+			status:
+				normalizedAction === 'approve'
+					? 'approved'
+					: normalizedAction === 'block_checkoff'
+						? 'blocked'
+						: 'needs_review',
 			mentor_notes: String(notes ?? ''),
 			checklist_results: Array.isArray(checklist_results) ? checklist_results : []
 		},
