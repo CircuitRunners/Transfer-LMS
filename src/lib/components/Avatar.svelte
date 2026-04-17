@@ -5,9 +5,18 @@
 		url?: string | null;
 		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 		ring?: boolean;
+		ringClass?: string;
 		title?: string;
 	}
-	let { name = '', email = '', url = '', size = 'md', ring = false, title }: Props = $props();
+	let {
+		name = '',
+		email = '',
+		url = '',
+		size = 'md',
+		ring = false,
+		ringClass = 'ring-white',
+		title
+	}: Props = $props();
 
 	const sizeMap = {
 		xs: 'h-6 w-6 text-[10px]',
@@ -47,12 +56,12 @@
 		src={url}
 		alt={name || 'avatar'}
 		title={title ?? name ?? ''}
-		class={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full object-cover ${sizeMap[size]} ${ring ? 'ring-2 ring-white' : ''}`}
+		class={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full object-cover ${sizeMap[size]} ${ring ? `ring-2 ${ringClass}` : ''}`}
 	/>
 {:else}
 	<span
 		title={title ?? name ?? ''}
-		class={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${sizeMap[size]} ${bgClass} ${ring ? 'ring-2 ring-white' : ''}`}
+		class={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${sizeMap[size]} ${bgClass} ${ring ? `ring-2 ${ringClass}` : ''}`}
 	>
 		{initials}
 	</span>

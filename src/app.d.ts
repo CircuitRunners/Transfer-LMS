@@ -12,6 +12,9 @@ declare global {
 					email: string;
 					full_name: string;
 					role: 'student' | 'student_lead' | 'mentor' | 'admin';
+					base_role: 'member' | 'admin';
+					is_mentor: boolean;
+					is_lead: boolean;
 					subteam_id: string | null;
 					bio: string;
 					avatar_url: string;
@@ -26,6 +29,9 @@ declare global {
 				email: string;
 				full_name: string;
 				role: 'student' | 'student_lead' | 'mentor' | 'admin';
+				base_role: 'member' | 'admin';
+				is_mentor: boolean;
+				is_lead: boolean;
 				subteam_id: string | null;
 				bio: string;
 				avatar_url: string;

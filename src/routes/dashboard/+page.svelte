@@ -1,9 +1,12 @@
 <script lang="ts">
-	type Node = { id: string; title: string; slug: string; subteam_id: string };
+type Node = { id: string; title: string; slug: string; subteam_id: string; video_url?: string | null };
 	type Status = { node_id: string; computed_status: string };
 	type Subteam = { id: string; name: string; slug: string };
 	type CheckoffReview = { node_id: string; status: 'needs_review' | 'blocked'; updated_at: string };
 	type PrereqEdge = { node_id: string; prerequisite_node_id: string };
+type NodeBlockRow = { node_id: string; id: string };
+type BlockProgressRow = { node_id: string; block_id: string; completed_at: string | null };
+type NodeOnlyRow = { node_id: string };
 
 	let { data } = $props();
 
@@ -23,26 +26,28 @@
 	};
 
 	let filter = $state('');
-	let onlyUnfinished = $state(false);
 	let showOtherCourses = $state(false);
 	let showCompletedCourses = $state(false);
 
 	const filtered = $derived.by(() => {
 		const needle = filter.trim().toLowerCase();
 		return (data.nodes as Node[]).filter((n) => {
-			const status = effectiveStatusFor(n.id);
-			if (onlyUnfinished && status === 'completed') return false;
 			if (!needle) return true;
 			return n.title.toLowerCase().includes(needle) || n.slug.toLowerCase().includes(needle);
 		});
 	});
 
 	const primaryTeamId = $derived((data.profile?.subteam_id as string | null | undefined) ?? null);
+const primaryTeamName = $derived.by(() => {
+	if (!primaryTeamId) return null;
+	const t = (data.subteams as Subteam[]).find((s) => s.id === primaryTeamId);
+	return t?.name ?? null;
+});
 	const prerequisites = $derived((data.prerequisites as PrereqEdge[]) ?? []);
 	const prereqDependentsCount = $derived.by(() => {
-		const map = new Map<string, number>();
+		const map: Record<string, number> = {};
 		for (const edge of prerequisites) {
-			map.set(edge.prerequisite_node_id, (map.get(edge.prerequisite_node_id) ?? 0) + 1);
+			map[edge.prerequisite_node_id] = (map[edge.prerequisite_node_id] ?? 0) + 1;
 		}
 		return map;
 	});
@@ -50,8 +55,7 @@
 	const inPrimaryTeam = (node: Node) =>
 		!primaryTeamId || String(node.subteam_id ?? '') === String(primaryTeamId);
 	const byPriority = (a: Node, b: Node) => {
-		const depDelta =
-			(prereqDependentsCount.get(b.id) ?? 0) - (prereqDependentsCount.get(a.id) ?? 0);
+		const depDelta = (prereqDependentsCount[b.id] ?? 0) - (prereqDependentsCount[a.id] ?? 0);
 		if (depDelta !== 0) return depDelta;
 		return a.title.localeCompare(b.title);
 	};
@@ -163,50 +167,82 @@
 			locked: 'Locked',
 			available: 'Ready',
 			video_pending: 'In video',
-			quiz_pending: 'Quiz open',
+			quiz_pending: 'In progress',
 			mentor_checkoff_pending: 'Awaiting mentor',
 			checkoff_needs_review: 'Redo checkoff',
 			checkoff_blocked: 'Blocked',
 			completed: 'Completed'
 		})[status] ?? status;
+
+const courseRowClass = (status: string) => {
+	const base =
+		'group flex w-full items-center justify-between rounded-lg border px-4 py-3 text-sm transition-all duration-150 hover:-translate-y-[1px]';
+	if (status === 'available' || status === 'video_pending' || status === 'quiz_pending') {
+		return `${base} border-emerald-600/60 bg-emerald-900/35 text-emerald-50 hover:border-emerald-500 hover:bg-emerald-800/40`;
+	}
+	if (
+		status === 'mentor_checkoff_pending' ||
+		status === 'checkoff_needs_review' ||
+		status === 'checkoff_blocked'
+	) {
+		return `${base} border-sky-600/60 bg-sky-900/30 text-sky-50 hover:border-sky-500 hover:bg-sky-800/40`;
+	}
+	if (status === 'completed') {
+		return `${base} border-slate-700 bg-slate-900/70 hover:border-slate-600 hover:bg-slate-800`;
+	}
+	return `${base} border-slate-700 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-800`;
+};
+const blockTotalsByNode = $derived.by(() => {
+	const out: Record<string, number> = {};
+	for (const row of data.blockRows as NodeBlockRow[]) {
+		out[row.node_id] = (out[row.node_id] ?? 0) + 1;
+	}
+	return out;
+});
+const assessmentNodeSet = $derived(new Set((data.assessmentRows as NodeOnlyRow[]).map((r) => r.node_id)));
+const checkoffNodeSet = $derived(new Set((data.checkoffRows as NodeOnlyRow[]).map((r) => r.node_id)));
+const nodeById = $derived(new Map((data.nodes as Node[]).map((n) => [n.id, n])));
+const totalModulesForNode = (nodeId: string) => {
+	const explicit = blockTotalsByNode[nodeId] ?? 0;
+	if (explicit > 0) return explicit;
+	const n = nodeById.get(nodeId);
+	if (!n) return 0;
+	let total = 0;
+	if ((n.video_url ?? '').trim()) total += 1;
+	if (assessmentNodeSet.has(nodeId)) total += 1;
+	if (checkoffNodeSet.has(nodeId)) total += 1;
+	return total;
+};
+const blockDoneByNode = $derived.by(() => {
+	const out: Record<string, number> = {};
+	for (const row of data.blockProgress as BlockProgressRow[]) {
+		if (!row.completed_at) continue;
+		out[row.node_id] = (out[row.node_id] ?? 0) + 1;
+	}
+	return out;
+});
+const progressLabelFor = (nodeId: string) => {
+	const total = totalModulesForNode(nodeId);
+	if (!total) return null;
+	const done = Math.min(blockDoneByNode[nodeId] ?? 0, total);
+	return `${done} / ${total} modules`;
+};
+
 </script>
 
 <section class="space-y-6">
-	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
-		<div class="flex flex-wrap items-start justify-between gap-3">
-			<div>
-				<h1 class="text-2xl font-semibold">Dashboard</h1>
-				<p class="text-slate-300">
-					Welcome {data.profile?.full_name || data.profile?.email || 'teammate'}.
-				</p>
-			</div>
-			<a href="/teams" class="inline-flex rounded border border-slate-800 px-3 py-1.5 text-sm hover:bg-slate-800"
-				>Manage teams</a
-			>
+	{#if !primaryTeamId}
+		<div class="rounded-xl border border-amber-700/60 bg-amber-900/30 p-4">
+			<p class="text-xs font-semibold uppercase tracking-wide text-amber-300">TODO</p>
+			<p class="mt-1 text-sm text-amber-200">
+				Select your team in <a class="underline" href="/teams">Teams</a> to enable a focused dashboard and priority course ordering.
+			</p>
 		</div>
-		<div class="mt-4 grid grid-cols-2 gap-2 text-center md:grid-cols-4">
-			<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
-				<p class="text-xs text-slate-400">Total</p>
-				<p class="text-lg font-semibold">{summary.total}</p>
-			</div>
-			<div class="rounded border border-emerald-700/60 bg-emerald-900/30 p-2">
-				<p class="text-xs text-emerald-300">Completed</p>
-				<p class="text-lg font-semibold text-emerald-200">{summary.completed}</p>
-			</div>
-			<div class="rounded border border-yellow-800/60 bg-yellow-900/20 p-2">
-				<p class="text-xs text-yellow-300">In progress</p>
-				<p class="text-lg font-semibold text-yellow-200">{summary.inProgress}</p>
-			</div>
-			<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
-				<p class="text-xs text-slate-400">Locked</p>
-				<p class="text-lg font-semibold">{summary.locked}</p>
-			</div>
-		</div>
-	</div>
+	{/if}
 
 	<div class="grid gap-3 md:grid-cols-3">
 		<div class="rounded-xl border border-yellow-700/40 bg-yellow-900/20 p-4 md:col-span-2">
-			<p class="text-xs font-semibold uppercase tracking-wide text-yellow-300">Next action</p>
+			<p class="text-xs font-semibold uppercase tracking-wide text-yellow-300">Up Next</p>
 			{#if redoCheckoff.length > 0}
 				<h2 class="mt-1 text-lg font-semibold">Action required: redo checkoff</h2>
 				<p class="text-sm text-yellow-100">
@@ -255,18 +291,14 @@
 		</div>
 	</div>
 
-	<div class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+	<div class="space-y-3">
 		<div class="flex flex-wrap items-center gap-2">
-			<h2 class="mr-auto text-lg font-semibold">Course Catalog</h2>
+			<h2 class="mr-auto text-lg font-semibold">{primaryTeamName ? `${primaryTeamName} Training` : 'My Team Training'}</h2>
 			<input
 				bind:value={filter}
 				placeholder="Search courses..."
 				class="w-full rounded bg-slate-800 px-2 py-2 text-sm md:w-64"
 			/>
-			<label class="flex items-center gap-2 text-xs text-slate-300">
-				<input type="checkbox" bind:checked={onlyUnfinished} class="accent-yellow-400" />
-				Hide completed
-			</label>
 		</div>
 
 		{#if filtered.length === 0}
@@ -275,34 +307,22 @@
 
 		{#if primaryTeamId}
 			<div class="space-y-3">
-				<div class="rounded border border-slate-800 bg-slate-900/30 p-3">
-					<div class="mb-2 flex items-center justify-between">
-						<p class="text-sm font-semibold text-emerald-200">Takeable now (your team)</p>
-						<p class="text-xs text-slate-400">Highest prerequisite impact first</p>
-					</div>
-					<p class="mb-2 text-xs text-slate-400">
-						Start here first to unlock the largest number of downstream courses.
-					</p>
+				{#if takeablePrimary.length > 0}
 					<div class="grid gap-2">
-						{#each takeablePrimary as node (node.id)}
+						{#each takeablePrimary.slice(0, 6) as node (node.id)}
 							{@const status = effectiveStatusFor(node.id)}
 							<a
 								href={`/learn/${node.slug}`}
-								class="flex items-center justify-between rounded border border-emerald-700/50 bg-emerald-950/20 px-3 py-2 text-sm transition hover:border-emerald-700 hover:bg-emerald-900/30"
+								class={courseRowClass(status)}
 							>
 								<span class="font-medium">{node.title}</span>
-								<div class="flex items-center gap-2">
-									<span class="text-[11px] text-slate-400">unlocks {prereqDependentsCount.get(node.id) ?? 0}</span>
-									<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
-										{statusLabel(status)}
-									</span>
-								</div>
+								<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
+									{statusLabel(status)}
+								</span>
 							</a>
-						{:else}
-							<p class="text-sm text-slate-400">No takeable team courses right now.</p>
 						{/each}
 					</div>
-				</div>
+				{/if}
 
 				<div class="rounded border border-slate-800 bg-slate-900/30 p-3">
 					<p class="mb-2 text-sm font-semibold text-slate-200">In progress / mentor stage</p>
@@ -312,14 +332,22 @@
 					<div class="grid gap-2">
 						{#each inProgressPrimary as node (node.id)}
 							{@const status = effectiveStatusFor(node.id)}
+							{@const progressLabel = progressLabelFor(node.id)}
 							<a
 								href={`/learn/${node.slug}`}
-								class="flex items-center justify-between rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-800"
+								class={courseRowClass(status)}
 							>
-								<span class="font-medium">{node.title}</span>
-								<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
-									{statusLabel(status)}
-								</span>
+								<div class="min-w-0">
+									<p class="truncate font-medium">{node.title}</p>
+									{#if progressLabel}
+										<p class="text-[11px] text-slate-300">{progressLabel}</p>
+									{/if}
+								</div>
+								<div class="flex items-center gap-2">
+									<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
+										{statusLabel(status)}
+									</span>
+								</div>
 							</a>
 						{:else}
 							<p class="text-sm text-slate-400">No in-progress team courses.</p>
@@ -328,16 +356,13 @@
 				</div>
 
 				<div class="rounded border border-slate-800 bg-slate-900/30 p-3">
-					<p class="mb-2 text-sm font-semibold text-slate-300">Locked (your team)</p>
-					<p class="mb-2 text-xs text-slate-400">
-						Complete prerequisites from the sections above to open these.
-					</p>
+					<p class="mb-2 text-sm font-semibold text-slate-300">Locked</p>
 					<div class="grid gap-2">
 						{#each lockedPrimary as node (node.id)}
 							{@const status = effectiveStatusFor(node.id)}
 							<a
 								href={`/learn/${node.slug}`}
-								class="flex items-center justify-between rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-800"
+								class={courseRowClass(status)}
 							>
 								<span class="font-medium">{node.title}</span>
 								<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
@@ -367,7 +392,7 @@
 								{@const status = effectiveStatusFor(node.id)}
 								<a
 									href={`/learn/${node.slug}`}
-									class="flex items-center justify-between rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-800"
+									class={courseRowClass(status)}
 								>
 									<span class="font-medium">{node.title}</span>
 									<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
@@ -395,14 +420,14 @@
 					<div class="mt-3 space-y-3">
 						<div>
 							<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-								Takeable outside your team
+								Available in other tracks
 							</p>
 							<div class="grid gap-2">
 								{#each otherTakeable as node (node.id)}
 									{@const status = effectiveStatusFor(node.id)}
 									<a
 										href={`/learn/${node.slug}`}
-										class="flex items-center justify-between rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-800"
+										class={courseRowClass(status)}
 									>
 										<span class="font-medium">{node.title}</span>
 										<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
@@ -423,7 +448,7 @@
 									{@const status = effectiveStatusFor(node.id)}
 									<a
 										href={`/learn/${node.slug}`}
-										class="flex items-center justify-between rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm transition hover:border-slate-800 hover:bg-slate-800"
+										class={courseRowClass(status)}
 									>
 										<span class="font-medium">{node.title}</span>
 										<span class={`rounded-full px-2 py-0.5 text-xs ${statusPillClass(status)}`}>
@@ -438,10 +463,6 @@
 					</div>
 				{/if}
 			</div>
-		{:else}
-			<p class="text-sm text-slate-400">
-				No primary team selected. Choose a team in <a class="underline" href="/teams">Teams</a> for a focused catalog view.
-			</p>
 		{/if}
 	</div>
 </section>

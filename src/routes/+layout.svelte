@@ -3,11 +3,12 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import Avatar from '$lib/components/Avatar.svelte';
+	import { isAdmin, isMentor, roleBadgeParts } from '$lib/roles';
 
 	let { children, data } = $props();
-	const role = $derived(data.profile?.role ?? 'student');
-	const canMentor = $derived(role === 'mentor' || role === 'admin');
-	const canAdmin = $derived(role === 'admin');
+	const canMentor = $derived(isMentor(data.profile));
+	const canAdmin = $derived(isAdmin(data.profile));
+	const roleLabel = $derived(roleBadgeParts(data.profile).join(' · '));
 
 	let mobileOpen = $state(false);
 
@@ -16,16 +17,14 @@
 	const primary: NavItem[] = [
 		{ href: '/dashboard', label: 'Dashboard' },
 		{ href: '/calendar', label: 'Calendar' },
-		{ href: '/teams', label: 'Teams', match: (p) => p.startsWith('/teams') },
-		{ href: '/passport', label: 'Passport' },
 		{ href: '/scan', label: 'Scan', match: (p) => p.startsWith('/scan') }
 	];
 
 	const mentorNav: NavItem[] = [
-		{ href: '/mentor', label: 'Mentor queue', match: (p) => p === '/mentor' },
+		{ href: '/mentor', label: 'Checkoffs queue', match: (p) => p === '/mentor' },
 		{
 			href: '/mentor/courses',
-			label: 'Courses',
+			label: 'Course management',
 			match: (p) => p.startsWith('/mentor/courses')
 		},
 		{
@@ -37,7 +36,6 @@
 	];
 
 	const adminNav: NavItem[] = [
-		{ href: '/admin', label: 'Admin home', match: (p) => p === '/admin' },
 		{ href: '/admin/settings', label: 'Workspace' },
 		{ href: '/admin/users', label: 'Users' },
 		{ href: '/admin/content', label: 'Content' },
@@ -144,13 +142,15 @@
 						email={data.profile.email}
 						url={data.profile.avatar_url}
 						size="md"
+						ring={isMentor(data.profile)}
+						ringClass="ring-sky-400"
 					/>
 					<div class="min-w-0 flex-1 leading-tight">
 						<p class="truncate text-sm font-medium text-slate-100">
 							{data.profile.full_name || data.profile.email}
 						</p>
 						<p class="truncate text-[11px] uppercase tracking-wider text-slate-500">
-							{data.profile.role.replace('_', ' ')}
+							{roleLabel}
 						</p>
 					</div>
 				</a>

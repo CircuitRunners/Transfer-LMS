@@ -1,5 +1,6 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase';
+import { isAdmin, isMentor } from '$lib/roles';
 
 const PUBLIC_ROUTES = new Set(['/', '/login']);
 const TEAM_EMAIL_DOMAIN = (process.env.TEAM_EMAIL_DOMAIN ?? '').toLowerCase();
@@ -27,7 +28,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		const { data: profile } = await event.locals.supabase
 			.from('profiles')
-			.select('id,email,full_name,role,subteam_id,bio,avatar_url')
+			.select('id,email,full_name,role,base_role,is_mentor,is_lead,subteam_id,bio,avatar_url')
 			.eq('id', user.id)
 			.single();
 
@@ -41,13 +42,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!session && !isPublicPath) throw redirect(303, '/login');
 	if (session && path === '/login') throw redirect(303, '/dashboard');
 
-	if (path.startsWith('/mentor') && profile && !['mentor', 'admin'].includes(profile.role)) {
+	if (path.startsWith('/mentor') && profile && !isMentor(profile)) {
 		throw redirect(303, '/dashboard');
 	}
-	if (path.startsWith('/roster') && profile && !['mentor', 'admin'].includes(profile.role)) {
+	if (path.startsWith('/roster') && profile && !isMentor(profile)) {
 		throw redirect(303, '/dashboard');
 	}
-	if (path.startsWith('/admin') && profile && profile.role !== 'admin') {
+	if (path.startsWith('/admin') && profile && !isAdmin(profile)) {
 		throw redirect(303, '/dashboard');
 	}
 

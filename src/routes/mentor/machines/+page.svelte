@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+
 	let { data } = $props();
 	let name = $state('');
 	let description = $state('');
@@ -6,6 +8,11 @@
 	let requiredNodeIds = $state<string[]>([]);
 	let error = $state('');
 	let success = $state('');
+	let editingId = $state<string | null>(null);
+	let editName = $state('');
+	let editDescription = $state('');
+	let editLocation = $state('');
+	let editRequiredNodeIds = $state<string[]>([]);
 
 	const toggleRequirement = (id: string, checked: boolean) => {
 		if (checked) requiredNodeIds = Array.from(new Set([...requiredNodeIds, id]));
@@ -32,6 +39,66 @@
 	};
 
 	const trainingName = (id: string) => data.courses.find((c: any) => c.id === id)?.title ?? id;
+	const beginEdit = (m: any) => {
+		editingId = m.id;
+		editName = String(m.name ?? '');
+		editDescription = String(m.description ?? '');
+		editLocation = String(m.location ?? '');
+		editRequiredNodeIds = Array.isArray(m.required_node_ids) ? m.required_node_ids.map(String) : [];
+		error = '';
+		success = '';
+	};
+	const cancelEdit = () => {
+		editingId = null;
+		editName = '';
+		editDescription = '';
+		editLocation = '';
+		editRequiredNodeIds = [];
+	};
+	const toggleEditRequirement = (id: string, checked: boolean) => {
+		if (checked) editRequiredNodeIds = Array.from(new Set([...editRequiredNodeIds, id]));
+		else editRequiredNodeIds = editRequiredNodeIds.filter((x) => x !== id);
+	};
+	const saveMachine = async () => {
+		if (!editingId) return;
+		const res = await fetch('/api/machines/update', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				machineId: editingId,
+				name: editName,
+				description: editDescription,
+				location: editLocation,
+				requiredNodeIds: editRequiredNodeIds
+			})
+		});
+		const body = await res.json().catch(() => null);
+		if (!res.ok) {
+			error = body?.error ?? 'Could not update machine.';
+			return;
+		}
+		success = `Updated ${body?.machine?.name ?? 'machine'}.`;
+		error = '';
+		cancelEdit();
+		await invalidateAll();
+	};
+	const deleteMachine = async (m: any) => {
+		if (!confirm(`Delete ${m.name}? This cannot be undone.`)) return;
+		const res = await fetch('/api/machines/delete', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ machineId: m.id })
+		});
+		const body = await res.json().catch(() => null);
+		if (!res.ok) {
+			error = body?.error ?? 'Could not delete machine.';
+			return;
+		}
+		success = `Deleted ${m.name}.`;
+		error = '';
+		if (editingId === m.id) cancelEdit();
+		await invalidateAll();
+	};
 </script>
 
 <section class="space-y-4">
@@ -98,6 +165,72 @@
 						? m.required_node_ids.map((id: string) => trainingName(id)).join(', ')
 						: 'None'}
 				</p>
+				<div class="mt-3 flex flex-wrap gap-2">
+					<button
+						type="button"
+						class="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+						onclick={() => beginEdit(m)}
+					>
+						Edit
+					</button>
+					<button
+						type="button"
+						class="rounded border border-red-700 px-2 py-1 text-xs text-red-200 hover:bg-red-900/30"
+						onclick={() => deleteMachine(m)}
+					>
+						Delete
+					</button>
+				</div>
+				{#if editingId === m.id}
+					<div class="mt-3 space-y-3 rounded-md border border-slate-700 bg-slate-900/60 p-3">
+						<p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Edit machine</p>
+						<div class="grid gap-3 md:grid-cols-2">
+							<label class="flex flex-col gap-1 text-sm">
+								<span>Name</span>
+								<input class="rounded bg-slate-800 px-2 py-2" bind:value={editName} />
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<span>Location</span>
+								<input class="rounded bg-slate-800 px-2 py-2" bind:value={editLocation} />
+							</label>
+							<label class="flex flex-col gap-1 text-sm md:col-span-2">
+								<span>Description</span>
+								<textarea class="rounded bg-slate-800 px-2 py-2" rows="3" bind:value={editDescription}></textarea>
+							</label>
+							<div class="md:col-span-2">
+								<p class="mb-1 text-sm text-slate-300">Required completed training</p>
+								<div class="grid max-h-40 gap-1 overflow-y-auto rounded border border-slate-800 bg-slate-900/40 p-2 md:grid-cols-2">
+									{#each data.courses as c}
+										<label class="flex items-center gap-2 text-sm">
+											<input
+												type="checkbox"
+												checked={editRequiredNodeIds.includes(c.id)}
+												onchange={(e) => toggleEditRequirement(c.id, (e.currentTarget as HTMLInputElement).checked)}
+											/>
+											<span>{c.title}</span>
+										</label>
+									{/each}
+								</div>
+							</div>
+							<div class="md:col-span-2 flex justify-end gap-2">
+								<button
+									type="button"
+									class="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
+									onclick={cancelEdit}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									class="rounded bg-yellow-400 px-3 py-1.5 text-sm font-semibold text-slate-900"
+									onclick={saveMachine}
+								>
+									Save changes
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
 				{#if m.qrDataUrl}
 					<img src={m.qrDataUrl} alt={`${m.name} QR`} class="mt-3 w-40 rounded bg-slate-900 p-2" />
 				{/if}

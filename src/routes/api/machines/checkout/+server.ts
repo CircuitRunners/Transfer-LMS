@@ -1,11 +1,12 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { jwtVerify } from 'jose';
+import { isMentor } from '$lib/roles';
 
 const encoder = new TextEncoder();
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const { user, profile } = await locals.safeGetSession();
-	if (!user || !profile || !['mentor', 'admin'].includes(profile.role)) {
+	if (!user || !profile || !isMentor(profile)) {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 

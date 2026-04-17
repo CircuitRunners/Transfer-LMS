@@ -1,10 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import QRCode from 'qrcode';
 import type { PageServerLoad } from './$types';
+import { isMentor } from '$lib/roles';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { user, profile } = await locals.safeGetSession();
-	if (!user || !profile || !['mentor', 'admin'].includes(profile.role)) throw redirect(303, '/dashboard');
+	if (!user || !profile || !isMentor(profile)) throw redirect(303, '/dashboard');
 
 	const [{ data: machines }, { data: courses }, { data: usageEvents }] = await Promise.all([
 		locals.supabase

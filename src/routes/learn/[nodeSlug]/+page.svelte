@@ -145,11 +145,32 @@
 		return blocks.length;
 	});
 
-	const activeBlock = $derived(
-		activeBlockIndex >= 0 && activeBlockIndex < blocks.length ? blocks[activeBlockIndex] : null
-	);
-
 	const allBlocksComplete = $derived(blocks.length > 0 && activeBlockIndex >= blocks.length);
+	let selectedBlockIndex = $state(0);
+	let hasManualBlockSelection = $state(false);
+	$effect(() => {
+		if (!blocks.length) {
+			selectedBlockIndex = 0;
+			hasManualBlockSelection = false;
+			return;
+		}
+		const defaultIndex = allBlocksComplete ? blocks.length - 1 : Math.min(activeBlockIndex, blocks.length - 1);
+		if (!hasManualBlockSelection) {
+			selectedBlockIndex = defaultIndex;
+			return;
+		}
+		if (selectedBlockIndex < 0 || selectedBlockIndex >= blocks.length) {
+			selectedBlockIndex = defaultIndex;
+			return;
+		}
+		const maxAccessible = allBlocksComplete ? blocks.length - 1 : activeBlockIndex;
+		if (selectedBlockIndex > maxAccessible) selectedBlockIndex = defaultIndex;
+	});
+
+	const viewingCurrentStep = $derived(!allBlocksComplete && selectedBlockIndex === activeBlockIndex);
+	const activeBlock = $derived(
+		selectedBlockIndex >= 0 && selectedBlockIndex < blocks.length ? blocks[selectedBlockIndex] : null
+	);
 
 	let marking = $state(false);
 	async function markLegacyVideoDone() {
@@ -186,7 +207,7 @@
 		locked: { label: 'Locked — finish prerequisites first', tone: 'slate' },
 		available: { label: 'Available', tone: 'slate' },
 		video_pending: { label: 'In progress', tone: 'slate' },
-		quiz_pending: { label: 'Quiz unlocked', tone: 'yellow' },
+		quiz_pending: { label: 'In progress', tone: 'yellow' },
 		mentor_checkoff_pending: { label: 'Awaiting mentor checkoff', tone: 'sky' },
 		checkoff_needs_review: { label: 'Action required: redo checkoff', tone: 'yellow' },
 		checkoff_blocked: { label: 'Blocked by mentor', tone: 'red' },
@@ -198,6 +219,10 @@
 
 	const blockedByMentor = $derived(reviewStatus === 'blocked' && certStatus === 'mentor_checkoff_pending');
 	const awaitingMentor = $derived(certStatus === 'mentor_checkoff_pending');
+	const prereqPlan = $derived((data.prereqPlan ?? []) as any[]);
+	const doablePrereqs = $derived(prereqPlan.filter((row: any) => row.isDoable));
+	const completedPrereqs = $derived(prereqPlan.filter((row: any) => row.status === 'completed'));
+	const lockedPrereqs = $derived(prereqPlan.filter((row: any) => !row.isDoable && row.status !== 'completed'));
 
 	const initialSubmissionPhotos = $derived.by(() => {
 		if (Array.isArray(data.submission?.photo_data_urls) && data.submission.photo_data_urls.length > 0) {
@@ -311,23 +336,139 @@
 		{/if}
 	</div>
 
+	{#if awaitingMentor && !completed}
+		<div class="rounded-xl border border-sky-700 bg-sky-900/30 p-4">
+			<h2 class="mb-1 text-lg font-semibold">Awaiting mentor checkoff</h2>
+			<p class="text-sm text-sky-200">
+				Your checkoff submission is ready for mentor review.
+			</p>
+			{#if data.reviewMentor}
+				<p class="mt-1 text-xs text-sky-200">
+					Last reviewed by {data.reviewMentor.full_name || data.reviewMentor.email}.
+				</p>
+			{/if}
+			{#if data.checkoffQrDataUrl}
+				<div class="mt-3 rounded border border-sky-700/60 bg-sky-900/20 p-3">
+					<p class="text-xs text-sky-100">
+						Show this QR to a mentor. Scanning it approves this submitted checkoff directly.
+					</p>
+					<img
+						src={data.checkoffQrDataUrl}
+						alt="Checkoff approval QR"
+						class="mt-2 h-36 w-36 rounded bg-white p-2"
+					/>
+				</div>
+			{/if}
+		</div>
+	{/if}
+	{#if completed || allBlocksComplete}
+		<div class="rounded-xl border border-emerald-700 bg-emerald-900/30 p-4">
+			<h2 class="mb-1 text-lg font-semibold text-emerald-200">Completed</h2>
+			<p class="text-sm text-emerald-200">
+				You've finished this module{data.cert?.approved_at
+					? ` on ${new Date(data.cert.approved_at).toLocaleDateString()}`
+					: ''}.
+			</p>
+			{#if data.certMentor}
+				<p class="mt-1 text-xs text-emerald-200">
+					Approved by {data.certMentor.full_name || data.certMentor.email}.
+				</p>
+			{/if}
+		</div>
+	{/if}
+
 	{#if locked}
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-			This module is locked. Complete its prerequisites on the
-			<a class="text-yellow-300 underline" href="/dashboard">dashboard</a> first.
+		<div class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+			<p>
+				This module is locked. Complete its prerequisites on the
+				<a class="text-yellow-300 underline" href="/dashboard">dashboard</a> first.
+			</p>
+			{#if prereqPlan.length > 0}
+				<div class="rounded border border-emerald-700/40 bg-emerald-900/20 p-3">
+					<p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-300">
+						Doable prerequisites
+					</p>
+					<div class="grid gap-1.5">
+						{#each doablePrereqs as row (row.id)}
+							<a
+								href={`/learn/${row.slug}`}
+								class="flex items-center justify-between rounded border border-emerald-700/40 bg-emerald-900/20 px-2.5 py-2 text-xs hover:border-emerald-600/60 hover:bg-emerald-900/30"
+							>
+								<span class="truncate">
+									{row.title}
+									<span class="ml-1 text-[10px] text-slate-400">({row.complexity} prereq)</span>
+								</span>
+								<span class="rounded-full bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-200">
+									Doable now
+								</span>
+							</a>
+						{:else}
+							<p class="text-xs text-slate-400">No currently doable prerequisites.</p>
+						{/each}
+					</div>
+				</div>
+
+				<div class="rounded border border-slate-700 bg-slate-900/50 p-3">
+					<p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+						Locked prerequisites
+					</p>
+					<div class="grid gap-1.5">
+						{#each lockedPrereqs as row (row.id)}
+							<a
+								href={`/learn/${row.slug}`}
+								class="flex items-center justify-between rounded border border-slate-700 bg-slate-900/50 px-2.5 py-2 text-xs hover:border-slate-600 hover:bg-slate-800"
+							>
+								<span class="truncate">
+									{row.title}
+									<span class="ml-1 text-[10px] text-slate-500">({row.complexity} prereq)</span>
+								</span>
+								<span class="rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
+									Locked
+								</span>
+							</a>
+						{:else}
+							<p class="text-xs text-slate-400">No locked prerequisites.</p>
+						{/each}
+					</div>
+				</div>
+
+				<div class="rounded border border-sky-700/40 bg-sky-900/20 p-3">
+					<p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-sky-300">
+						Completed prerequisites
+					</p>
+					<div class="grid gap-1.5">
+						{#each completedPrereqs as row (row.id)}
+							<a
+								href={`/learn/${row.slug}`}
+								class="flex items-center justify-between rounded border border-sky-700/40 bg-sky-900/20 px-2.5 py-2 text-xs hover:border-sky-600/60 hover:bg-sky-900/30"
+							>
+								<span class="truncate">
+									{row.title}
+									<span class="ml-1 text-[10px] text-slate-400">({row.complexity} prereq)</span>
+								</span>
+								<span class="rounded-full bg-sky-900/40 px-1.5 py-0.5 text-[10px] text-sky-200">
+									Completed
+								</span>
+							</a>
+						{:else}
+							<p class="text-xs text-slate-400">No completed prerequisites yet.</p>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{:else if blocks.length === 0}
 		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
 			No blocks have been added to this module yet. Ask a mentor to configure the course.
 		</div>
 	{:else}
-		<div class="space-y-4 pb-28">
+		<div class="space-y-4 pb-24">
 			{#if activeBlock}
 				{@const meta = blockTypeMeta(activeBlock.type)}
 				<div class={`space-y-4 rounded-xl border bg-slate-900 p-4 ${meta.border}`}>
 				<div class="flex flex-wrap items-center gap-2">
 					<span class={`rounded-full px-2 py-0.5 text-xs ${meta.chip}`}>
-						{activeBlockIndex + 1}. {meta.label}
+						{selectedBlockIndex + 1}. {meta.label}
 					</span>
 					<h2 class="text-lg font-semibold">{blockSummary(activeBlock)}</h2>
 				</div>
@@ -361,17 +502,23 @@
 						<p class="text-sm text-slate-400">No video URL configured for this block.</p>
 					{/if}
 					<div class="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3">
-						<button
-							class="rounded bg-yellow-400 px-3 py-1.5 text-sm font-semibold text-slate-900 disabled:opacity-60"
-							onclick={() =>
-								activeBlock.legacy ? markLegacyVideoDone() : markBlockVideoDone(activeBlock)}
-							disabled={marking}
-						>
-							{marking ? 'Marking…' : 'I finished this video'}
-						</button>
-						<span class="text-xs text-slate-400">
-							Marks this video complete and unlocks the next block.
-						</span>
+						{#if viewingCurrentStep}
+							<button
+								class="rounded bg-yellow-400 px-3 py-1.5 text-sm font-semibold text-slate-900 disabled:opacity-60"
+								onclick={() =>
+									activeBlock.legacy ? markLegacyVideoDone() : markBlockVideoDone(activeBlock)}
+								disabled={marking}
+							>
+								{marking ? 'Marking…' : 'I finished this video'}
+							</button>
+							<span class="text-xs text-slate-400">
+								Marks this video complete and unlocks the next block.
+							</span>
+						{:else}
+							<span class="text-xs text-slate-400">
+								Viewing a completed step. Return to the current step to continue progress.
+							</span>
+						{/if}
 					</div>
 				{:else if activeBlock.type === 'quiz'}
 					{#if (activeBlock.config.questions ?? []).length === 0}
@@ -530,65 +677,38 @@
 				</div>
 			{/if}
 
-			<div class="pointer-events-none fixed bottom-3 left-1/2 z-30 w-[min(100%-1rem,1100px)] -translate-x-1/2">
-				<div class="pointer-events-auto overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/95 shadow-xl backdrop-blur">
-					<div class="border-b border-slate-700 px-3 py-2">
-						<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Course flow</p>
-					</div>
-					<div class="overflow-x-auto px-2 py-2">
-						<div class="flex min-w-max items-stretch gap-2">
-							{#each blocks as block, i (block.id)}
-								{@const done = isBlockCompleted(block)}
-								{@const active = i === activeBlockIndex && !done}
-								{@const meta = blockTypeMeta(block.type)}
-								<div
-									class={`min-w-[180px] rounded-lg border px-2.5 py-2 text-xs ${
-										done
-											? 'border-emerald-700 bg-emerald-900/30 text-emerald-200'
-											: active
-												? 'border-yellow-400 bg-yellow-900/40 text-yellow-100 shadow-md'
-												: 'border-slate-700 bg-slate-800/60 text-slate-300'
-									}`}
-								>
-									<p class="truncate font-semibold">{i + 1}. {blockSummary(block)}</p>
-									<p class="mt-1 text-[11px]">{done ? 'Completed' : active ? 'Current step' : 'Upcoming'}</p>
-									<span class={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] ${meta.chip}`}>{meta.label}</span>
-								</div>
-							{/each}
-						</div>
+			<div class="fixed bottom-0 left-0 right-0 z-30 md:left-64">
+				<div class="overflow-x-auto border-t border-slate-700 bg-slate-900/95 px-3 py-2 backdrop-blur">
+					<div class="flex min-w-max items-stretch gap-2">
+						{#each blocks as block, i (block.id)}
+							{@const done = isBlockCompleted(block)}
+							{@const active = i === activeBlockIndex && !done}
+							{@const meta = blockTypeMeta(block.type)}
+							{@const accessible = allBlocksComplete || i <= activeBlockIndex}
+							<button
+								type="button"
+								onclick={() => {
+									if (!accessible) return;
+									hasManualBlockSelection = true;
+									selectedBlockIndex = i;
+								}}
+								disabled={!accessible}
+								class={`min-w-[180px] rounded-md border px-2.5 py-2 text-left text-xs transition ${
+									done
+										? 'border-emerald-700 bg-emerald-900/30 text-emerald-200'
+										: active
+											? 'border-yellow-400 bg-yellow-900/40 text-yellow-100'
+											: 'border-slate-700 bg-slate-800/60 text-slate-300'
+								} ${accessible ? 'hover:border-slate-500' : 'cursor-not-allowed opacity-70'}`}
+							>
+								<p class="truncate font-semibold">{i + 1}. {blockSummary(block)}</p>
+								<p class="mt-1 text-[11px]">{done ? 'Completed' : active ? 'Current step' : 'Upcoming'}</p>
+								<span class={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] ${meta.chip}`}>{meta.label}</span>
+							</button>
+						{/each}
 					</div>
 				</div>
 			</div>
-		</div>
-	{/if}
-
-	{#if awaitingMentor && !completed}
-		<div class="rounded-xl border border-sky-700 bg-sky-900/30 p-4">
-			<h2 class="mb-1 text-lg font-semibold">Awaiting mentor checkoff</h2>
-			<p class="text-sm text-sky-200">
-				Your checkoff submission is ready for mentor review.
-			</p>
-			{#if data.reviewMentor}
-				<p class="mt-1 text-xs text-sky-200">
-					Last reviewed by {data.reviewMentor.full_name || data.reviewMentor.email}.
-				</p>
-			{/if}
-		</div>
-	{/if}
-
-	{#if completed || allBlocksComplete}
-		<div class="rounded-xl border border-emerald-700 bg-emerald-900/30 p-4">
-			<h2 class="mb-1 text-lg font-semibold text-emerald-200">Completed</h2>
-			<p class="text-sm text-emerald-200">
-				You've finished this module{data.cert?.approved_at
-					? ` on ${new Date(data.cert.approved_at).toLocaleDateString()}`
-					: ''}.
-			</p>
-			{#if data.certMentor}
-				<p class="mt-1 text-xs text-emerald-200">
-					Approved by {data.certMentor.full_name || data.certMentor.email}.
-				</p>
-			{/if}
 		</div>
 	{/if}
 </section>

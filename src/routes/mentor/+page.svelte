@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	let { data } = $props();
 	let queue = $state<any[]>([]);
+	let queueSearch = $state('');
 	let actionError = $state('');
 	let selectedItem = $state<any | null>(null);
 	let selectedImage = $state<string | null>(null);
@@ -17,6 +18,23 @@
 		total: queue.length,
 		withEvidence: queue.filter((q) => (q.submission?.photo_data_urls?.length ?? 0) > 0 || q.submission?.photo_data_url).length,
 		needsEvidence: queue.filter((q) => q.requirement?.evidence_mode === 'photo_required' && !(q.submission?.photo_data_urls?.length || q.submission?.photo_data_url)).length
+	});
+	const photosFor = (submission: any): string[] => {
+		if (Array.isArray(submission?.photo_data_urls) && submission.photo_data_urls.length > 0) {
+			return submission.photo_data_urls;
+		}
+		if (submission?.photo_data_url) return [submission.photo_data_url];
+		return [];
+	};
+	const filteredQueue = $derived.by(() => {
+		const needle = queueSearch.trim().toLowerCase();
+		if (!needle) return queue;
+		return queue.filter((item) => {
+			const name = (item.profile?.full_name ?? item.profile?.email ?? '').toLowerCase();
+			const course = (item.node?.title ?? '').toLowerCase();
+			const team = (item.node?.subteam?.name ?? '').toLowerCase();
+			return name.includes(needle) || course.includes(needle) || team.includes(needle);
+		});
 	});
 	const PUBLIC_SUPABASE_URL = publicEnv.PUBLIC_SUPABASE_URL ?? 'https://example.supabase.co';
 	const PUBLIC_SUPABASE_ANON_KEY = publicEnv.PUBLIC_SUPABASE_ANON_KEY ?? 'public-anon-key';
@@ -42,6 +60,24 @@
 	});
 
 	const onDecodedForCheckoff = async (token: string) => {
+		// First try direct checkoff-approval QR tokens.
+		const approveRes = await fetch('/api/mentor/checkoff', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ action: 'approve', checkoffToken: token })
+		});
+		if (approveRes.ok) {
+			const body = await approveRes.json().catch(() => null);
+			scanMessage = 'Checkoff approved from QR.';
+			const uid = String(body?.userId ?? '');
+			const nid = String(body?.nodeId ?? '');
+			if (uid && nid) {
+				queue = queue.filter((entry: any) => !(String(entry.user_id) === uid && String(entry.node_id) === nid));
+			}
+			return;
+		}
+
+		// Fallback to passport scan flow.
 		const res = await fetch('/api/mentor/resolve-qr', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -105,85 +141,6 @@
 		if (selectedItem?.id === item.id) selectedItem = null;
 	};
 
-	const onRetryCheckoff = async (item: any, notes = '', checklist_results: any[] = []) => {
-		const res = await fetch('/api/mentor/checkoff', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				nodeId: item.node_id,
-				userId: item.user_id,
-				blockId: item.active_block_id ?? null,
-				action: 'retry_checkoff',
-				notes,
-				checklist_results,
-				qrToken: scannedQrToken
-			})
-		});
-		if (!res.ok) {
-			const body = await res.json().catch(() => null);
-			actionError = body?.error ?? 'Could not request checkoff retry.';
-			return;
-		}
-		actionError = '';
-		queue = queue.map((entry: any) =>
-			entry.id === item.id
-				? {
-						...entry,
-						derivedCheckoffStatus: 'needs_review',
-						review: {
-							...(entry.review ?? {}),
-							status: 'needs_review',
-							mentor_notes: notes,
-							checklist_results,
-							updated_at: new Date().toISOString()
-						}
-					}
-				: entry
-		);
-		if (selectedItem?.id === item.id) {
-			selectedItem = queue.find((entry: any) => entry.id === item.id) ?? selectedItem;
-		}
-	};
-
-	const onBlockCheckoff = async (item: any, notes = '', checklist_results: any[] = []) => {
-		const res = await fetch('/api/mentor/checkoff', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				nodeId: item.node_id,
-				userId: item.user_id,
-				blockId: item.active_block_id ?? null,
-				action: 'block_checkoff',
-				notes,
-				checklist_results,
-				qrToken: scannedQrToken
-			})
-		});
-		if (!res.ok) {
-			const body = await res.json().catch(() => null);
-			actionError = body?.error ?? 'Could not block checkoff.';
-			return;
-		}
-		actionError = '';
-		queue = queue.map((entry: any) =>
-			entry.id === item.id
-				? {
-						...entry,
-						derivedCheckoffStatus: 'blocked',
-						review: {
-							...(entry.review ?? {}),
-							status: 'blocked',
-							mentor_notes: notes,
-							checklist_results,
-							updated_at: new Date().toISOString()
-						}
-					}
-				: entry
-		);
-		if (selectedItem?.id === item.id) {
-			selectedItem = queue.find((entry: any) => entry.id === item.id) ?? selectedItem;
-		}
-	};
 </script>
 
 <section class="space-y-4">
@@ -246,20 +203,73 @@
 			<p class="text-xl font-semibold text-amber-200">{summary.needsEvidence}</p>
 		</div>
 	</div>
-	{#if !queue.length}
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-3">
+		<input
+			bind:value={queueSearch}
+			placeholder="Search by student, course, or team..."
+			class="w-full rounded border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm"
+		/>
+	</div>
+	{#if !filteredQueue.length}
 		<p class="text-slate-300">No students are waiting for checkoff.</p>
 	{:else}
-		<div class="grid gap-3 md:grid-cols-2">
-			{#each queue as item}
-				<CheckoffCard
-					{item}
-					{onApprove}
-					onReview={onResetQuiz}
-					onRetryCheckoff={onRetryCheckoff}
-					{onBlockCheckoff}
-					onOpen={(next: any) => (selectedItem = next)}
-					onImageOpen={(url: string) => (selectedImage = url)}
-				/>
+		<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+			{#each filteredQueue as item}
+				<div
+					class="space-y-2 rounded-lg border border-slate-700 bg-slate-900/70 p-3 transition hover:border-slate-500"
+					role="button"
+					tabindex="0"
+					onclick={() => (selectedItem = item)}
+					onkeydown={(event) => {
+						if (event.key === 'Enter' || event.key === ' ') {
+							event.preventDefault();
+							selectedItem = item;
+						}
+					}}
+				>
+					<div class="flex items-start justify-between gap-2">
+						<div class="min-w-0">
+							<p class="truncate font-semibold">{item.profile?.full_name || item.profile?.email}</p>
+							<p class="truncate text-xs text-slate-400">{item.node?.title}</p>
+						</div>
+						<span class="rounded-full bg-sky-900/30 px-2 py-0.5 text-xs text-sky-200">Pending</span>
+					</div>
+					{#if photosFor(item.submission).length}
+						<div class="grid grid-cols-3 gap-1">
+							{#each photosFor(item.submission).slice(0, 3) as photo}
+								<button
+									type="button"
+									onclick={(event) => {
+										event.stopPropagation();
+										selectedImage = photo;
+									}}
+								>
+									<img src={photo} alt="Evidence" class="h-14 w-full rounded object-cover" />
+								</button>
+							{/each}
+						</div>
+					{/if}
+					<div class="flex gap-2 pt-1">
+						<button
+							class="flex-1 rounded bg-emerald-600 px-2 py-1.5 text-sm font-semibold hover:bg-emerald-500"
+							onclick={(event) => {
+								event.stopPropagation();
+								onApprove(item);
+							}}
+						>
+							Accept
+						</button>
+						<button
+							class="flex-1 rounded bg-amber-600 px-2 py-1.5 text-sm font-semibold hover:bg-amber-500"
+							onclick={(event) => {
+								event.stopPropagation();
+								onResetQuiz(item);
+							}}
+						>
+							Reject/Reset
+						</button>
+					</div>
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -299,40 +309,34 @@
 	</div>
 
 	{#if selectedItem}
-		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-			<div class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
+		<div
+			class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4"
+			role="button"
+			tabindex="0"
+			onclick={() => (selectedItem = null)}
+			onkeydown={(event) => {
+				if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') selectedItem = null;
+			}}
+		>
+			<div
+				class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-slate-800 bg-slate-900 p-4"
+				onclick={(event) => event.stopPropagation()}
+			>
 				<div class="mb-3 flex items-center justify-between">
 					<h2 class="text-lg font-semibold">Full Review</h2>
-					<button class="rounded border border-slate-800 px-3 py-1 text-sm" onclick={() => (selectedItem = null)}
+					<button
+						class="rounded border border-slate-800 px-3 py-1 text-sm"
+						onclick={(event) => {
+							event.stopPropagation();
+							selectedItem = null;
+						}}
 						>Close</button
 					>
-				</div>
-				<div class="mb-3 rounded border border-slate-800 bg-slate-900 p-3">
-					<p class="mb-2 text-xs text-slate-400">Required: scan this student's passport before action</p>
-					<div class="grid gap-3 md:grid-cols-2">
-						<div class="rounded bg-slate-900/60 p-2">
-							<QRScanner onDecoded={onDecodedForCheckoff} />
-						</div>
-						<div class="text-sm text-slate-300">
-							<p>Selected student: {selectedItem.profile?.full_name || selectedItem.profile?.email}</p>
-							<p>
-								Scanned student id: {scannedStudentId || '—'}
-								{#if scannedStudentId === selectedItem.user_id}
-									<span class="ml-2 text-emerald-300">match</span>
-								{:else if scannedStudentId}
-									<span class="ml-2 text-red-300">mismatch</span>
-								{/if}
-							</p>
-							{#if scanMessage}<p class="mt-1 text-xs text-slate-400">{scanMessage}</p>{/if}
-						</div>
-					</div>
 				</div>
 				<CheckoffCard
 					item={selectedItem}
 					{onApprove}
 					onReview={onResetQuiz}
-					onRetryCheckoff={onRetryCheckoff}
-					{onBlockCheckoff}
 					onOpen={() => {}}
 					onImageOpen={(url: string) => (selectedImage = url)}
 				/>

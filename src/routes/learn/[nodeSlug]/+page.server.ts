@@ -1,5 +1,9 @@
 import { error, fail } from '@sveltejs/kit';
+import { SignJWT } from 'jose';
+import QRCode from 'qrcode';
 import type { Actions, PageServerLoad } from './$types';
+
+const encoder = new TextEncoder();
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const { user, profile } = await locals.safeGetSession();
@@ -85,6 +89,21 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 
 	const computedStatus = statusRow?.computed_status ?? cert?.status ?? 'locked';
 	const effectiveStatus = previewBypass && computedStatus === 'locked' ? 'available' : computedStatus;
+	let checkoffQrDataUrl = '';
+	if (submission) {
+		const secret = encoder.encode(process.env.PASSPORT_QR_SECRET ?? 'dev-secret-change-me');
+		const token = await new SignJWT({
+			kind: 'checkoff_approve',
+			user_id: user.id,
+			node_id: node.id,
+			block_id: submission.block_id ?? null
+		})
+			.setProtectedHeader({ alg: 'HS256' })
+			.setIssuedAt()
+			.setExpirationTime('30d')
+			.sign(secret);
+		checkoffQrDataUrl = await QRCode.toDataURL(token);
+	}
 	const mentorIds = Array.from(
 		new Set([String(cert?.approved_by ?? ''), String(review?.reviewer_id ?? '')].filter(Boolean))
 	);
@@ -92,6 +111,66 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		? await locals.supabase.from('profiles').select('id,full_name,email').in('id', mentorIds)
 		: { data: [] as any[] };
 	const mentorById = new Map((mentorProfiles ?? []).map((p: any) => [String(p.id), p]));
+	let prereqPlan: Array<{
+		id: string;
+		title: string;
+		slug: string;
+		status: string;
+		complexity: number;
+		isDoable: boolean;
+	}> = [];
+	if (effectiveStatus === 'locked') {
+		const [{ data: edges }, { data: allNodes }, { data: allStatuses }] = await Promise.all([
+			locals.supabase.from('node_prerequisites').select('node_id,prerequisite_node_id'),
+			locals.supabase.from('nodes').select('id,title,slug'),
+			locals.supabase
+				.from('v_user_node_status')
+				.select('node_id,computed_status')
+				.eq('user_id', user.id)
+		]);
+		const edgesList = (edges ?? []) as Array<{ node_id: string; prerequisite_node_id: string }>;
+		const nodeById = new Map((allNodes ?? []).map((n: any) => [String(n.id), n]));
+		const statusByNodeId = new Map(
+			(allStatuses ?? []).map((s: any) => [String(s.node_id), String(s.computed_status)])
+		);
+		const prereqByNode = new Map<string, string[]>();
+		for (const e of edgesList) {
+			const list = prereqByNode.get(String(e.node_id)) ?? [];
+			list.push(String(e.prerequisite_node_id));
+			prereqByNode.set(String(e.node_id), list);
+		}
+		const allPrereqs = new Set<string>();
+		const walk = (id: string) => {
+			for (const p of prereqByNode.get(id) ?? []) {
+				if (allPrereqs.has(p)) continue;
+				allPrereqs.add(p);
+				walk(p);
+			}
+		};
+		walk(String(node.id));
+		const actionable = new Set(['available', 'video_pending', 'quiz_pending']);
+		prereqPlan = Array.from(allPrereqs)
+			.map((id) => {
+				const n = nodeById.get(id);
+				if (!n) return null;
+				const status = statusByNodeId.get(id) ?? 'locked';
+				const complexity = (prereqByNode.get(id) ?? []).length;
+				return {
+					id,
+					title: String(n.title ?? ''),
+					slug: String(n.slug ?? ''),
+					status,
+					complexity,
+					isDoable: actionable.has(status)
+				};
+			})
+			.filter(Boolean) as typeof prereqPlan;
+		prereqPlan.sort((a, b) => {
+			if (a.isDoable !== b.isDoable) return a.isDoable ? -1 : 1;
+			if (a.complexity !== b.complexity) return a.complexity - b.complexity;
+			return a.title.localeCompare(b.title);
+		});
+	}
 
 	return {
 		node,
@@ -119,7 +198,9 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		blocks: blocks ?? [],
 		blockProgress: blockProgress ?? [],
 		blockAttempts: blockAttempts ?? [],
-		previewBypass
+		previewBypass,
+		checkoffQrDataUrl,
+		prereqPlan
 	};
 };
 

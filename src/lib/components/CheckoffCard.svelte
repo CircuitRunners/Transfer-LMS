@@ -1,7 +1,7 @@
 <script lang="ts">
-	let { item, onApprove, onReview, onRetryCheckoff, onBlockCheckoff, onOpen, onImageOpen } = $props();
+	let { item, onApprove, onReview, onOpen, onImageOpen } = $props();
 
-	let busy = $state<'' | 'approve' | 'review' | 'retry' | 'block'>('');
+	let busy = $state<'' | 'approve' | 'review'>('');
 	let notes = $state('');
 	let checklistStates = $state<Record<string, boolean>>({});
 
@@ -49,36 +49,6 @@
 		try {
 			const checklist_results = Object.entries(checklistStates).map(([item, passed]) => ({ item, passed }));
 			await onReview(item, notes.trim(), checklist_results);
-		} finally {
-			busy = '';
-		}
-	}
-
-	async function retryCheckoff() {
-		if (busy) return;
-		const ok = confirm(
-			`Keep quiz pass and request checkoff rework for ${item.profile?.full_name || item.profile?.email}?`
-		);
-		if (!ok) return;
-		busy = 'retry';
-		try {
-			const checklist_results = Object.entries(checklistStates).map(([item, passed]) => ({ item, passed }));
-			await onRetryCheckoff(item, notes.trim(), checklist_results);
-		} finally {
-			busy = '';
-		}
-	}
-
-	async function blockCheckoff() {
-		if (busy) return;
-		const ok = confirm(
-			`Block this checkoff for ${item.profile?.full_name || item.profile?.email}? Use this for safety or major compliance issues.`
-		);
-		if (!ok) return;
-		busy = 'block';
-		try {
-			const checklist_results = Object.entries(checklistStates).map(([item, passed]) => ({ item, passed }));
-			await onBlockCheckoff(item, notes.trim(), checklist_results);
 		} finally {
 			busy = '';
 		}
@@ -221,27 +191,7 @@
 			}}
 			disabled={!!busy}
 		>
-			{busy === 'review' ? 'Resetting…' : 'Reset Quiz & Try Again'}
-		</button>
-		<button
-			class="rounded bg-slate-700 px-3 py-1 text-sm font-semibold hover:bg-slate-600 disabled:opacity-60"
-			onclick={(event) => {
-				event.stopPropagation();
-				retryCheckoff();
-			}}
-			disabled={!!busy}
-		>
-			{busy === 'retry' ? 'Saving…' : 'Retry Checkoff (Keep Quiz)'}
-		</button>
-		<button
-			class="rounded bg-red-700 px-3 py-1 text-sm font-semibold hover:bg-red-600 disabled:opacity-60"
-			onclick={(event) => {
-				event.stopPropagation();
-				blockCheckoff();
-			}}
-			disabled={!!busy}
-		>
-			{busy === 'block' ? 'Blocking…' : 'Block Checkoff'}
+			{busy === 'review' ? 'Rejecting…' : 'Reject / Reset'}
 		</button>
 	</div>
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { isMentor } from '$lib/roles';
 	let { data, form } = $props();
-	const isMentor = $derived(['mentor', 'admin'].includes(data.profile?.role));
+	const canMentor = $derived(isMentor(data.profile));
 
 	const message = $derived.by(() => {
 		if (form?.error) return { tone: 'error' as const, text: form.error };
@@ -69,7 +70,7 @@
 		</div>
 	</form>
 
-	{#if isMentor}
+	{#if canMentor}
 		<form
 			method="POST"
 			action="?/saveMentorTeams"

@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { isMentor } from '$lib/roles';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { user, profile } = await locals.safeGetSession();
@@ -8,7 +9,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const { data: subteams } = await locals.supabase.from('subteams').select('id,name,slug').order('name');
 
 	let mentorTeamIds: string[] = [];
-	if (['mentor', 'admin'].includes(profile.role)) {
+	if (isMentor(profile)) {
 		const { data: prefs } = await locals.supabase
 			.from('mentor_subteam_preferences')
 			.select('subteam_id')
@@ -37,7 +38,7 @@ export const actions: Actions = {
 
 	saveMentorTeams: async ({ locals, request }) => {
 		const { user, profile } = await locals.safeGetSession();
-		if (!user || !profile || !['mentor', 'admin'].includes(profile.role)) {
+		if (!user || !profile || !isMentor(profile)) {
 			return fail(403, { error: 'Forbidden' });
 		}
 

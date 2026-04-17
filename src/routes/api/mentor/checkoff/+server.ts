@@ -9,12 +9,43 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	const { nodeId, userId, blockId, action, notes, checklist_results, qrToken } = await request.json();
+	const {
+		nodeId,
+		userId,
+		blockId,
+		action,
+		notes,
+		checklist_results,
+		qrToken,
+		checkoffToken
+	} = await request.json();
+	const normalizedAction = action === 'review' ? 'reset_quiz' : action;
+	let resolvedNodeId = String(nodeId ?? '');
+	let resolvedUserId = String(userId ?? '');
+	let resolvedBlockId = blockId ? String(blockId) : null;
+
+	if (checkoffToken) {
+		try {
+			const { payload } = await jwtVerify(
+				String(checkoffToken),
+				encoder.encode(process.env.PASSPORT_QR_SECRET ?? 'dev-secret-change-me')
+			);
+			if (String(payload.kind ?? '') !== 'checkoff_approve') {
+				return json({ error: 'Invalid checkoff QR token.' }, { status: 400 });
+			}
+			resolvedNodeId = String(payload.node_id ?? '');
+			resolvedUserId = String(payload.user_id ?? '');
+			resolvedBlockId = payload.block_id ? String(payload.block_id) : null;
+		} catch {
+			return json({ error: 'Invalid or expired checkoff QR token.' }, { status: 400 });
+		}
+	}
+
 	const upsertReview = async (status: 'approved' | 'needs_review' | 'blocked') => {
 		const payload = {
-			user_id: userId,
-			node_id: nodeId,
-			block_id: blockId ?? null,
+			user_id: resolvedUserId,
+			node_id: resolvedNodeId,
+			block_id: resolvedBlockId,
 			reviewer_id: user.id,
 			status,
 			mentor_notes: String(notes ?? ''),
@@ -23,10 +54,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		const updateQuery = locals.supabase
 			.from('checkoff_reviews')
 			.update(payload)
-			.eq('user_id', userId)
-			.eq('node_id', nodeId);
-		const { data: updatedRows, error: updateErr } = blockId
-			? await updateQuery.eq('block_id', blockId).select('id').limit(1)
+			.eq('user_id', resolvedUserId)
+			.eq('node_id', resolvedNodeId);
+		const { data: updatedRows, error: updateErr } = resolvedBlockId
+			? await updateQuery.eq('block_id', resolvedBlockId).select('id').limit(1)
 			: await updateQuery.is('block_id', null).select('id').limit(1);
 		if (updateErr) return updateErr;
 		if (!updatedRows || updatedRows.length === 0) {
@@ -35,10 +66,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		}
 		return null;
 	};
-	const normalizedAction = action === 'review' ? 'reset_quiz' : action;
 	if (
-		!nodeId ||
-		!userId ||
+		!resolvedNodeId ||
+		!resolvedUserId ||
 		!['approve', 'reset_quiz', 'retry_checkoff', 'block_checkoff'].includes(normalizedAction)
 	) {
 		return json({ error: 'Invalid request payload' }, { status: 400 });
@@ -48,15 +78,18 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		const submissionQuery = locals.supabase
 			.from('checkoff_submissions')
 			.select('photo_data_url,photo_data_urls')
-			.eq('node_id', nodeId)
-			.eq('user_id', userId);
+			.eq('node_id', resolvedNodeId)
+			.eq('user_id', resolvedUserId);
 		const [{ data: requirement }, { data: submission }] = await Promise.all([
 			locals.supabase
 				.from('node_checkoff_requirements')
 				.select('evidence_mode,mentor_checklist')
-				.eq('node_id', nodeId)
+				.eq('node_id', resolvedNodeId)
 				.maybeSingle(),
-			(blockId ? submissionQuery.eq('block_id', blockId) : submissionQuery.is('block_id', null)).maybeSingle()
+			(resolvedBlockId
+				? submissionQuery.eq('block_id', resolvedBlockId)
+				: submissionQuery.is('block_id', null)
+			).maybeSingle()
 		]);
 		const hasPhoto = Boolean(
 			submission?.photo_data_url ||
@@ -94,23 +127,25 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	if (profile.role === 'mentor' && user) {
-		if (!qrToken) {
+		if (!qrToken && !checkoffToken) {
 			return json({ error: 'Mentor must scan student passport QR before checkoff actions.' }, { status: 400 });
 		}
-		try {
-			const { payload } = await jwtVerify(
-				String(qrToken),
-				encoder.encode(process.env.PASSPORT_QR_SECRET ?? 'dev-secret-change-me')
-			);
-			if (String(payload.user_id ?? '') !== String(userId)) {
-				return json({ error: 'Scanned passport does not match selected student.' }, { status: 400 });
+		if (!checkoffToken) {
+			try {
+				const { payload } = await jwtVerify(
+					String(qrToken),
+					encoder.encode(process.env.PASSPORT_QR_SECRET ?? 'dev-secret-change-me')
+				);
+				if (String(payload.user_id ?? '') !== String(resolvedUserId)) {
+					return json({ error: 'Scanned passport does not match selected student.' }, { status: 400 });
+				}
+			} catch {
+				return json({ error: 'Invalid or expired QR token. Rescan student passport.' }, { status: 400 });
 			}
-		} catch {
-			return json({ error: 'Invalid or expired QR token. Rescan student passport.' }, { status: 400 });
 		}
 
 		const [{ data: node }, { data: prefs }] = await Promise.all([
-			locals.supabase.from('nodes').select('subteam_id').eq('id', nodeId).maybeSingle(),
+			locals.supabase.from('nodes').select('subteam_id').eq('id', resolvedNodeId).maybeSingle(),
 			locals.supabase
 				.from('mentor_subteam_preferences')
 				.select('subteam_id')
@@ -124,9 +159,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	if (normalizedAction === 'reset_quiz') {
 		const { error } = await locals.supabase.rpc('transition_certification', {
-			p_node_id: nodeId,
+			p_node_id: resolvedNodeId,
 			p_new_status: 'quiz_pending',
-			p_target_user_id: userId,
+			p_target_user_id: resolvedUserId,
 			p_mentor_notes: notes ?? null
 		});
 		if (error) return json({ error: error.message }, { status: 400 });
@@ -136,8 +171,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		const { data: checkoffBlock } = await locals.supabase
 			.from('node_blocks')
 			.select('id')
-			.eq('id', blockId ?? '')
-			.eq('node_id', nodeId)
+			.eq('id', resolvedBlockId ?? '')
+			.eq('node_id', resolvedNodeId)
 			.eq('type', 'checkoff')
 			.maybeSingle();
 
@@ -145,7 +180,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			const { error: progressErr } = await locals.supabase.from('user_node_block_progress').upsert(
 				{
 					user_id: userId,
-					node_id: nodeId,
+					user_id: resolvedUserId,
+					node_id: resolvedNodeId,
 					block_id: checkoffBlock.id,
 					completed_at: new Date().toISOString()
 				},
@@ -160,24 +196,25 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		if (checkoffBlock?.id) {
 			const { error: autoErr } = await locals.supabase.rpc('try_auto_complete_node', {
 				p_node_id: nodeId,
-				p_target_user_id: userId
+				p_node_id: resolvedNodeId,
+				p_target_user_id: resolvedUserId
 			});
 			if (autoErr) return json({ error: autoErr.message }, { status: 400 });
 			await locals.supabase.rpc('transition_certification', {
-				p_node_id: nodeId,
+				p_node_id: resolvedNodeId,
 				p_new_status: 'quiz_pending',
-				p_target_user_id: userId
+				p_target_user_id: resolvedUserId
 			});
 		} else {
 			const { error } = await locals.supabase.rpc('transition_certification', {
-				p_node_id: nodeId,
+				p_node_id: resolvedNodeId,
 				p_new_status: 'completed',
-				p_target_user_id: userId,
+				p_target_user_id: resolvedUserId,
 				p_mentor_notes: notes ?? null
 			});
 			if (error) return json({ error: error.message }, { status: 400 });
 		}
-		return json({ ok: true });
+		return json({ ok: true, nodeId: resolvedNodeId, userId: resolvedUserId });
 	}
 
 	if (normalizedAction === 'retry_checkoff') {

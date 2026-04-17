@@ -7,15 +7,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	const { sessionId } = await request.json();
-	if (!sessionId) return json({ error: 'sessionId is required' }, { status: 400 });
+	const body = await request.json().catch(() => null);
+	const machineId = String(body?.machineId ?? '').trim();
+	if (!machineId) return json({ error: 'Machine id is required.' }, { status: 400 });
 
-	const { error } = await locals.supabase
-		.from('machine_checkout_sessions')
-		.update({ ended_at: new Date().toISOString() })
-		.eq('id', sessionId)
-		.is('ended_at', null);
-
+	const { error } = await locals.supabase.from('machines').delete().eq('id', machineId);
 	if (error) return json({ error: error.message }, { status: 400 });
 	return json({ ok: true });
 };

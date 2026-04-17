@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { isAdmin, isLead, isMentor } from '$lib/roles';
 
 const DAYS = 14;
 
@@ -24,8 +25,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!user || !profile) throw redirect(303, '/login');
 
 	const scope = (url.searchParams.get('scope') ?? 'me') as 'me' | 'team' | 'all';
-	const canTeam = profile.role === 'mentor' || profile.role === 'student_lead' || profile.role === 'admin';
-	const canAll = profile.role === 'admin';
+	const canTeam = isMentor(profile) || isLead(profile);
+	const canAll = isAdmin(profile);
 
 	const { start, end, dates } = buildWindow();
 
@@ -49,22 +50,36 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		email: string;
 		avatar_url: string;
 		role: string;
+		base_role: string | null;
+		is_mentor: boolean | null;
+		is_lead: boolean | null;
 		subteam_id: string | null;
+	};
+	const rosterRank = (r: RosterUser) => {
+		if (isMentor(r)) return 0;
+		if (isAdmin(r)) return 1;
+		if (isLead(r)) return 2;
+		return 3;
+	};
+	const rosterSort = (a: RosterUser, b: RosterUser) => {
+		const rankDelta = rosterRank(a) - rosterRank(b);
+		if (rankDelta !== 0) return rankDelta;
+		return (a.full_name || a.email).localeCompare(b.full_name || b.email);
 	};
 	let roster: RosterUser[] = [];
 	if (scope === 'team' && canTeam && profile.subteam_id) {
 		const { data } = await locals.supabase
 			.from('profiles')
-			.select('id,full_name,email,avatar_url,role,subteam_id')
+			.select('id,full_name,email,avatar_url,role,base_role,is_mentor,is_lead,subteam_id')
 			.eq('subteam_id', profile.subteam_id)
 			.order('full_name');
-		roster = data ?? [];
+		roster = (data ?? []).sort(rosterSort);
 	} else if (scope === 'all' && canAll) {
 		const { data } = await locals.supabase
 			.from('profiles')
-			.select('id,full_name,email,avatar_url,role,subteam_id')
+			.select('id,full_name,email,avatar_url,role,base_role,is_mentor,is_lead,subteam_id')
 			.order('full_name');
-		roster = data ?? [];
+		roster = (data ?? []).sort(rosterSort);
 	}
 
 	let rosterAvailability: Array<{ user_id: string; shift_date: string; shift_number: number }> = [];
@@ -87,7 +102,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		bucket.set(key, list);
 	}
 	const rosterByKey: Record<string, string[]> = {};
-	bucket.forEach((v, k) => (rosterByKey[k] = v));
+	const rosterOrder = new Map(roster.map((r, idx) => [r.id, idx]));
+	bucket.forEach((v, k) =>
+		(rosterByKey[k] = v.slice().sort((a, b) => (rosterOrder.get(a) ?? 9999) - (rosterOrder.get(b) ?? 9999)))
+	);
 
 	return {
 		scope,
