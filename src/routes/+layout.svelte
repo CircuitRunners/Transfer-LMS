@@ -44,9 +44,23 @@
 
 	const isActive = (item: NavItem, p: string) =>
 		item.match ? item.match(p) : p === item.href;
+
+	$effect(() => {
+		const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
+		const shouldLockBackground = mobileOpen && isMobileViewport;
+		document.body.style.overflow = shouldLockBackground ? 'hidden' : '';
+		document.body.style.touchAction = shouldLockBackground ? 'none' : '';
+		return () => {
+			document.body.style.overflow = '';
+			document.body.style.touchAction = '';
+		};
+	});
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<link rel="icon" href={favicon} />
+	<meta name="theme-color" content="#020617" />
+</svelte:head>
 
 <div class="flex min-h-dvh bg-slate-950 text-slate-100 md:h-screen md:overflow-hidden">
 	<!-- Sidebar -->

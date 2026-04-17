@@ -194,17 +194,21 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		if (reviewErr) return json({ error: reviewErr.message }, { status: 400 });
 
 		if (checkoffBlock?.id) {
-			const { error: autoErr } = await locals.supabase.rpc('try_auto_complete_node', {
+			const { data: autoCert, error: autoErr } = await locals.supabase.rpc('try_auto_complete_node', {
 				p_node_id: nodeId,
 				p_node_id: resolvedNodeId,
 				p_target_user_id: resolvedUserId
 			});
 			if (autoErr) return json({ error: autoErr.message }, { status: 400 });
-			await locals.supabase.rpc('transition_certification', {
-				p_node_id: resolvedNodeId,
-				p_new_status: 'quiz_pending',
-				p_target_user_id: resolvedUserId
-			});
+			// Keep progress moving for partially-finished block courses,
+			// but do not overwrite a freshly completed certification.
+			if (autoCert?.status !== 'completed') {
+				await locals.supabase.rpc('transition_certification', {
+					p_node_id: resolvedNodeId,
+					p_new_status: 'quiz_pending',
+					p_target_user_id: resolvedUserId
+				});
+			}
 		} else {
 			const { error } = await locals.supabase.rpc('transition_certification', {
 				p_node_id: resolvedNodeId,
