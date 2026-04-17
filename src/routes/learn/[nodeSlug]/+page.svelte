@@ -263,10 +263,10 @@
 
 	function blockTypeMeta(type: BlockType) {
 		if (type === 'video')
-			return { label: 'Video', chip: 'bg-sky-900/40 text-sky-200', border: 'border-sky-700/50' };
+			return { label: 'Video', chip: 'bg-sky-50 text-sky-800', border: 'border-sky-200/50' };
 		if (type === 'quiz')
 			return { label: 'Quiz', chip: 'bg-yellow-900/40 text-yellow-200', border: 'border-yellow-700/50' };
-		return { label: 'Checkoff', chip: 'bg-emerald-900/40 text-emerald-200', border: 'border-emerald-700/50' };
+		return { label: 'Checkoff', chip: 'bg-emerald-50 text-emerald-800', border: 'border-emerald-200/50' };
 	}
 
 	function blockSummary(block: LearnBlock): string {
@@ -282,48 +282,48 @@
 
 <section class="space-y-4">
 	<div>
-		<a href="/dashboard" class="text-xs text-slate-400">← Dashboard</a>
+		<a href="/dashboard" class="text-xs text-neutral-500">← Dashboard</a>
 		<h1 class="text-2xl font-semibold">{data.node.title}</h1>
 		{#if data.node.description}
-			<p class="text-slate-300">{data.node.description}</p>
+			<p class="text-neutral-700">{data.node.description}</p>
 		{/if}
 		<p class="mt-2 text-xs">
 			<span
 				class={`inline-flex rounded-full px-2 py-0.5 ${
 					statusInfo.tone === 'emerald'
-						? 'bg-emerald-900/40 text-emerald-200'
+						? 'bg-emerald-50 text-emerald-800'
 						: statusInfo.tone === 'red'
-							? 'bg-red-900/40 text-red-200'
+							? 'bg-red-50 text-red-800'
 						: statusInfo.tone === 'sky'
-							? 'bg-sky-900/40 text-sky-200'
+							? 'bg-sky-50 text-sky-800'
 							: statusInfo.tone === 'yellow'
 								? 'bg-yellow-900/40 text-yellow-200'
-								: 'bg-slate-800 text-slate-300'
+								: 'bg-neutral-100 text-neutral-700'
 				}`}
 			>
 				{statusInfo.label}
 			</span>
 		</p>
 		{#if data.previewBypass}
-			<p class="mt-2 text-xs text-sky-300">
+			<p class="mt-2 text-xs text-sky-700">
 				Preview mode: prerequisite locks are bypassed for mentor/admin preview.
 			</p>
 		{/if}
 	</div>
 
 	{#if locked}
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+		<div class="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
 			This module is locked. Complete its prerequisites on the
 			<a class="text-yellow-300 underline" href="/dashboard">dashboard</a> first.
 		</div>
 	{:else if blocks.length === 0}
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+		<div class="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
 			No blocks have been added to this module yet. Ask a mentor to configure the course.
 		</div>
 	{:else}
 		<div class="grid gap-4 lg:grid-cols-[280px,1fr]">
-			<aside class="h-fit rounded-xl border border-slate-800 bg-slate-900 p-3">
-				<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Course flow</p>
+			<aside class="h-fit rounded-xl border border-neutral-200 bg-white p-3">
+				<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Course flow</p>
 				<div class="space-y-2">
 					{#each blocks as block, i (block.id)}
 						{@const done = isBlockCompleted(block)}
@@ -332,10 +332,10 @@
 						<div
 							class={`rounded border px-2 py-2 text-xs ${
 								done
-									? 'border-emerald-800 bg-emerald-900/20 text-emerald-200'
+									? 'border-emerald-200 bg-emerald-50 text-emerald-800'
 									: active
-										? 'border-yellow-500 bg-yellow-500/10 text-yellow-200'
-										: 'border-slate-800 bg-slate-950/40 text-slate-400'
+										? 'border-yellow-500 bg-yellow-50 text-yellow-200'
+										: 'border-neutral-200 bg-white/40 text-neutral-500'
 							}`}
 						>
 							<p class="font-semibold">{i + 1}. {blockSummary(block)}</p>
@@ -348,7 +348,7 @@
 
 			{#if activeBlock}
 				{@const meta = blockTypeMeta(activeBlock.type)}
-				<div class={`space-y-4 rounded-xl border bg-slate-900 p-4 ${meta.border}`}>
+				<div class={`space-y-4 rounded-xl border bg-white p-4 ${meta.border}`}>
 				<div class="flex flex-wrap items-center gap-2">
 					<span class={`rounded-full px-2 py-0.5 text-xs ${meta.chip}`}>
 						{activeBlockIndex + 1}. {meta.label}
@@ -370,21 +370,21 @@
 						/>
 					{:else if activeBlock.config.video_url}
 						<div class="space-y-2">
-							<p class="text-sm text-slate-300">
+							<p class="text-sm text-neutral-700">
 								This video can't be embedded directly. Open it on YouTube to watch, then mark it done.
 							</p>
 							<a
 								href={activeBlock.config.video_url}
 								target="_blank"
 								rel="noopener noreferrer"
-								class="inline-flex rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
+								class="inline-flex rounded bg-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-300"
 								>Open on YouTube ↗</a
 							>
 						</div>
 					{:else}
-						<p class="text-sm text-slate-400">No video URL configured for this block.</p>
+						<p class="text-sm text-neutral-500">No video URL configured for this block.</p>
 					{/if}
-					<div class="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3">
+					<div class="flex flex-wrap items-center gap-3 border-t border-neutral-200 pt-3">
 						<button
 							class="rounded bg-yellow-400 px-3 py-1.5 text-sm font-semibold text-slate-900 disabled:opacity-60"
 							onclick={() =>
@@ -393,13 +393,13 @@
 						>
 							{marking ? 'Marking…' : 'I finished this video'}
 						</button>
-						<span class="text-xs text-slate-400">
+						<span class="text-xs text-neutral-500">
 							Marks this video complete and unlocks the next block.
 						</span>
 					</div>
 				{:else if activeBlock.type === 'quiz'}
 					{#if (activeBlock.config.questions ?? []).length === 0}
-						<p class="text-sm text-slate-400">No quiz questions configured yet. Ask a mentor to add some.</p>
+						<p class="text-sm text-neutral-500">No quiz questions configured yet. Ask a mentor to add some.</p>
 					{:else}
 						<Quiz
 							questions={activeBlock.config.questions}
@@ -413,14 +413,14 @@
 				{:else}
 					{@const c = activeBlock.config}
 					{#if c.directions}
-						<p class="text-sm text-slate-300">{c.directions}</p>
+						<p class="text-sm text-neutral-700">{c.directions}</p>
 					{/if}
 					{#if Array.isArray(c.mentor_checklist) && c.mentor_checklist.length > 0}
-						<div class="rounded bg-slate-950/60 p-3">
-							<p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+						<div class="rounded bg-white/60 p-3">
+							<p class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
 								Mentor checklist
 							</p>
-							<ul class="list-disc space-y-1 pl-5 text-sm text-slate-200">
+							<ul class="list-disc space-y-1 pl-5 text-sm text-neutral-800">
 								{#each c.mentor_checklist as item}
 									<li>{item}</li>
 								{/each}
@@ -428,8 +428,8 @@
 						</div>
 					{/if}
 					{#if Array.isArray(c.resource_links) && c.resource_links.length > 0}
-						<div class="rounded bg-slate-950/60 p-3">
-							<p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Resources</p>
+						<div class="rounded bg-white/60 p-3">
+							<p class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">Resources</p>
 							<ul class="space-y-1 text-sm">
 								{#each c.resource_links as link}
 									<li>
@@ -453,7 +453,7 @@
 								}
 							};
 						}}
-						class="space-y-3 rounded border border-slate-800 bg-slate-950/60 p-3"
+						class="space-y-3 rounded border border-neutral-200 bg-white/60 p-3"
 					>
 						<input
 							type="hidden"
@@ -461,22 +461,22 @@
 							value={activeBlock.legacy ? '' : activeBlock.id}
 						/>
 						{#if blockedByMentor}
-							<p class="rounded border border-red-700 bg-red-900/20 p-2 text-xs text-red-200">
+							<p class="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
 								This checkoff is blocked by a mentor. Resolve the feedback before further review.
 							</p>
 						{/if}
 						<label class="flex flex-col gap-1 text-sm">
-							<span class="text-slate-300">What did you complete?</span>
+							<span class="text-neutral-700">What did you complete?</span>
 							<textarea
 								name="notes"
 								rows="3"
-								class="rounded bg-slate-800 px-2 py-2"
+								class="rounded bg-neutral-100 px-2 py-2"
 								placeholder="Describe what you built/demonstrated, tools used, and any issues."
 								disabled={blockedByMentor}
 							>{data.submission?.notes ?? ''}</textarea>
 						</label>
 						<label class="flex flex-col gap-1 text-sm">
-							<span class="text-slate-300">
+							<span class="text-neutral-700">
 								Photo evidence
 								{#if c.evidence_mode === 'photo_required'}(required){/if}
 								{#if c.evidence_mode === 'photo_optional'}(optional){/if}
@@ -498,12 +498,12 @@
 										<img
 											src={photo}
 											alt="Checkoff submission preview"
-											class="h-24 w-full rounded border border-slate-700 object-cover"
+											class="h-24 w-full rounded border border-neutral-200 object-cover"
 										/>
 										<button
 											type="button"
 											onclick={() => removePhoto(idx)}
-											class="absolute right-1 top-1 rounded bg-slate-900/80 px-1.5 py-0.5 text-[11px] text-red-200"
+											class="absolute right-1 top-1 rounded bg-neutral-50 px-1.5 py-0.5 text-[11px] text-red-800"
 										>
 											Remove
 										</button>
@@ -512,7 +512,7 @@
 							</div>
 						{/if}
 						{#if checkoffMessage}
-							<p class="text-xs text-slate-300">{checkoffMessage}</p>
+							<p class="text-xs text-neutral-700">{checkoffMessage}</p>
 						{/if}
 						<button
 							class="rounded bg-yellow-400 px-3 py-2 text-sm font-semibold text-slate-900 disabled:opacity-60"
@@ -523,26 +523,26 @@
 						</button>
 					</form>
 					{#if data.review}
-						<div class="rounded border border-slate-700 bg-slate-950/40 p-3 text-sm">
-							<p class="font-semibold text-slate-200">Latest mentor feedback</p>
+						<div class="rounded border border-neutral-200 bg-white/40 p-3 text-sm">
+							<p class="font-semibold text-neutral-800">Latest mentor feedback</p>
 							{#if data.reviewMentor}
-								<p class="mt-1 text-xs text-slate-400">
+								<p class="mt-1 text-xs text-neutral-500">
 									By {data.reviewMentor.full_name || data.reviewMentor.email}
 								</p>
 							{/if}
-							<p class="mt-1 text-slate-300">{data.review.mentor_notes || 'No notes yet.'}</p>
+							<p class="mt-1 text-neutral-700">{data.review.mentor_notes || 'No notes yet.'}</p>
 							{#if data.review.status === 'needs_review'}
-								<p class="mt-2 text-xs text-amber-200">
+								<p class="mt-2 text-xs text-amber-800">
 									Mentor requested updates. Your current submission stays saved; update notes/photos and save again.
 								</p>
 							{/if}
 							{#if data.review.status === 'blocked'}
-								<p class="mt-2 text-xs text-red-200">
+								<p class="mt-2 text-xs text-red-800">
 									Mentor has blocked this checkoff pending safety/compliance resolution.
 								</p>
 							{/if}
 							{#if (data.review.checklist_results ?? []).length > 0}
-								<ul class="mt-2 list-disc pl-5 text-xs text-slate-300">
+								<ul class="mt-2 list-disc pl-5 text-xs text-neutral-700">
 									{#each data.review.checklist_results as row}
 										<li>{row.item}: {row.passed ? 'passed' : 'needs work'}</li>
 									{/each}
@@ -557,13 +557,13 @@
 	{/if}
 
 	{#if awaitingMentor && !completed}
-		<div class="rounded-xl border border-sky-700 bg-sky-900/20 p-4">
+		<div class="rounded-xl border border-sky-200 bg-sky-50 p-4">
 			<h2 class="mb-1 text-lg font-semibold">Awaiting mentor checkoff</h2>
-			<p class="text-sm text-sky-100">
+			<p class="text-sm text-sky-800">
 				Your checkoff submission is ready for mentor review.
 			</p>
 			{#if data.reviewMentor}
-				<p class="mt-1 text-xs text-sky-200">
+				<p class="mt-1 text-xs text-sky-800">
 					Last reviewed by {data.reviewMentor.full_name || data.reviewMentor.email}.
 				</p>
 			{/if}
@@ -571,15 +571,15 @@
 	{/if}
 
 	{#if completed || allBlocksComplete}
-		<div class="rounded-xl border border-emerald-700 bg-emerald-900/20 p-4">
-			<h2 class="mb-1 text-lg font-semibold text-emerald-200">Completed</h2>
-			<p class="text-sm text-emerald-100">
+		<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+			<h2 class="mb-1 text-lg font-semibold text-emerald-800">Completed</h2>
+			<p class="text-sm text-emerald-800">
 				You've finished this module{data.cert?.approved_at
 					? ` on ${new Date(data.cert.approved_at).toLocaleDateString()}`
 					: ''}.
 			</p>
 			{#if data.certMentor}
-				<p class="mt-1 text-xs text-emerald-200">
+				<p class="mt-1 text-xs text-emerald-800">
 					Approved by {data.certMentor.full_name || data.certMentor.email}.
 				</p>
 			{/if}

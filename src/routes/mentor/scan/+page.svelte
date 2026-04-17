@@ -21,14 +21,14 @@
 
 <section class="space-y-4">
 	<h1 class="text-2xl font-semibold">QR Scanner</h1>
-	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+	<div class="rounded-xl border border-neutral-200 bg-white p-4">
 		<QRScanner {onDecoded} />
 	</div>
-	{#if error}<p class="text-red-300">{error}</p>{/if}
+	{#if error}<p class="text-red-700">{error}</p>{/if}
 	{#if result}
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+		<div class="rounded-xl border border-neutral-200 bg-white p-4">
 			<p class="font-semibold">{result.profile?.full_name || result.profile?.email}</p>
-			<ul class="mt-2 list-disc pl-5 text-sm text-slate-300">
+			<ul class="mt-2 list-disc pl-5 text-sm text-neutral-700">
 				{#each result.certifications ?? [] as cert}
 					<li>{cert.nodes?.title}</li>
 				{/each}

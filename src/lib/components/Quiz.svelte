@@ -72,9 +72,9 @@
 </script>
 
 {#if result?.passed}
-	<div class="space-y-3 rounded border border-emerald-700 bg-emerald-900/30 p-4">
-		<p class="text-lg font-semibold text-emerald-200">Passed! Score: {result.score}%</p>
-		<p class="text-sm text-emerald-100">
+	<div class="space-y-3 rounded border border-emerald-200 bg-emerald-50 p-4">
+		<p class="text-lg font-semibold text-emerald-800">Passed! Score: {result.score}%</p>
+		<p class="text-sm text-emerald-800">
 			Your request has been sent to a mentor for the hands-on "Do" checkoff. Visit the
 			<a class="underline" href="/passport">passport</a> or your dashboard to track status.
 		</p>
@@ -82,25 +82,25 @@
 {:else}
 	<form class="space-y-4" onsubmit={onSubmit}>
 		{#if result && !result.passed}
-			<div class="rounded border border-amber-700 bg-amber-900/30 p-3 text-sm text-amber-100">
+			<div class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
 				You scored {result.score}% (need {passingScore}% to pass). Review the questions and try
 				again.
 			</div>
 		{/if}
 		{#if errorMsg}
-			<div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-100">
+			<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
 				{errorMsg}
 			</div>
 		{/if}
 
 		{#each questions as question, i (question.id ?? i)}
-			<fieldset class="space-y-2 rounded border border-slate-700 bg-slate-900/60 p-3">
-				<legend class="px-1 text-xs text-slate-400">Question {i + 1}</legend>
+			<fieldset class="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
+				<legend class="px-1 text-xs text-neutral-500">Question {i + 1}</legend>
 				<p class="font-medium">{question.prompt}</p>
 				{#if question.type === 'mc'}
 					<div class="space-y-1">
 						{#each question.options ?? [] as option, oi (oi)}
-							<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-800">
+							<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-neutral-100">
 								<input
 									type="radio"
 									name={question.id}
@@ -122,7 +122,7 @@
 								class={`cursor-pointer rounded border px-4 py-1 text-sm ${
 									answers[question.id] === v
 										? 'border-yellow-400 bg-yellow-400/20 text-yellow-200'
-										: 'border-slate-700 bg-slate-800 hover:bg-slate-700'
+										: 'border-neutral-200 bg-neutral-100 hover:bg-neutral-200'
 								}`}
 							>
 								<input
@@ -141,7 +141,7 @@
 					</div>
 				{:else}
 					<input
-						class="w-full rounded bg-slate-800 px-2 py-2"
+						class="w-full rounded bg-neutral-100 px-2 py-2"
 						name={question.id}
 						bind:value={answers[question.id]}
 						placeholder="Your answer"
@@ -161,16 +161,16 @@
 				{!allowSubmit ? 'Quiz already passed' : submitting ? 'Grading…' : result && !result.passed ? 'Resubmit' : 'Submit quiz'}
 			</button>
 			{#if unanswered > 0}
-				<span class="text-xs text-slate-400">{unanswered} question(s) unanswered</span>
+				<span class="text-xs text-neutral-500">{unanswered} question(s) unanswered</span>
 			{/if}
 			{#if !allowSubmit}
-				<span class="text-xs text-slate-400">{lockedMessage || 'No resubmission needed right now.'}</span>
+				<span class="text-xs text-neutral-500">{lockedMessage || 'No resubmission needed right now.'}</span>
 			{/if}
 			{#if result && !result.passed}
 				<button
 					type="button"
 					onclick={retake}
-					class="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+					class="rounded border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-100"
 					>Clear answers</button
 				>
 			{/if}

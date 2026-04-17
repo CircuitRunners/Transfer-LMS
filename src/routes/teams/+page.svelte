@@ -13,9 +13,9 @@
 </script>
 
 <section class="space-y-6">
-	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+	<div class="rounded-xl border border-neutral-200 bg-white p-4">
 		<h1 class="text-2xl font-semibold">Teams</h1>
-		<p class="text-sm text-slate-300">
+		<p class="text-sm text-neutral-700">
 			Set your primary team for course organization and (for mentors) choose the teams you want to
 			check off.
 		</p>
@@ -25,8 +25,8 @@
 		<div
 			class={`rounded border p-3 text-sm ${
 				message.tone === 'error'
-					? 'border-red-700 bg-red-900/30 text-red-100'
-					: 'border-emerald-700 bg-emerald-900/30 text-emerald-100'
+					? 'border-red-200 bg-red-50 text-red-800'
+					: 'border-emerald-200 bg-emerald-50 text-emerald-800'
 			}`}
 		>
 			{message.text}
@@ -36,15 +36,15 @@
 	<form
 		method="POST"
 		action="?/setPrimaryTeam"
-		class="rounded-xl border border-slate-800 bg-slate-900 p-4"
+		class="rounded-xl border border-neutral-200 bg-white p-4"
 	>
 		<h2 class="text-lg font-semibold">Primary team</h2>
-		<p class="mb-3 text-xs text-slate-400">
+		<p class="mb-3 text-xs text-neutral-500">
 			This drives your default course grouping and teammate context.
 		</p>
 		<div class="grid gap-2 md:grid-cols-2">
 			{#each data.subteams as team}
-				<label class="flex cursor-pointer items-center gap-2 rounded border border-slate-800 p-3 hover:bg-slate-800/60">
+				<label class="flex cursor-pointer items-center gap-2 rounded border border-neutral-200 p-3 hover:bg-neutral-100">
 					<input
 						type="radio"
 						name="subteam_id"
@@ -54,7 +54,7 @@
 					/>
 					<div>
 						<p class="font-medium">{team.name}</p>
-						<p class="text-xs text-slate-500">{team.slug}</p>
+						<p class="text-xs text-neutral-400">{team.slug}</p>
 					</div>
 				</label>
 			{/each}
@@ -63,7 +63,7 @@
 			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900" type="submit"
 				>Save primary team</button
 			>
-			<button class="rounded border border-slate-700 px-4 py-2 text-sm" type="submit" name="subteam_id" value=""
+			<button class="rounded border border-neutral-200 px-4 py-2 text-sm" type="submit" name="subteam_id" value=""
 				>Clear</button
 			>
 		</div>
@@ -73,15 +73,15 @@
 		<form
 			method="POST"
 			action="?/saveMentorTeams"
-			class="rounded-xl border border-slate-800 bg-slate-900 p-4"
+			class="rounded-xl border border-neutral-200 bg-white p-4"
 		>
 			<h2 class="text-lg font-semibold">Mentor checkoff teams</h2>
-			<p class="mb-3 text-xs text-slate-400">
+			<p class="mb-3 text-xs text-neutral-500">
 				Pick which teams should appear in your mentor queue when filtering to "My teams".
 			</p>
 			<div class="grid gap-2 md:grid-cols-2">
 				{#each data.subteams as team}
-					<label class="flex cursor-pointer items-center gap-2 rounded border border-slate-800 p-3 hover:bg-slate-800/60">
+					<label class="flex cursor-pointer items-center gap-2 rounded border border-neutral-200 p-3 hover:bg-neutral-100">
 						<input
 							type="checkbox"
 							name="mentor_team_ids"
@@ -91,7 +91,7 @@
 						/>
 						<div>
 							<p class="font-medium">{team.name}</p>
-							<p class="text-xs text-slate-500">{team.slug}</p>
+							<p class="text-xs text-neutral-400">{team.slug}</p>
 						</div>
 					</label>
 				{/each}

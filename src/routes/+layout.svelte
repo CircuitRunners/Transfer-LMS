@@ -2,76 +2,217 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
+	import Avatar from '$lib/components/Avatar.svelte';
 
 	let { children, data } = $props();
 	const role = $derived(data.profile?.role ?? 'student');
 	const canMentor = $derived(role === 'mentor' || role === 'admin');
 	const canAdmin = $derived(role === 'admin');
+
+	let mobileOpen = $state(false);
+
+	type NavItem = { href: string; label: string; match?: (p: string) => boolean };
+
+	const primary: NavItem[] = [
+		{ href: '/dashboard', label: 'Dashboard' },
+		{ href: '/calendar', label: 'Calendar' },
+		{ href: '/teams', label: 'Teams', match: (p) => p.startsWith('/teams') },
+		{ href: '/passport', label: 'Passport' },
+		{ href: '/scan', label: 'Scan', match: (p) => p.startsWith('/scan') }
+	];
+
+	const mentorNav: NavItem[] = [
+		{ href: '/mentor', label: 'Mentor queue', match: (p) => p === '/mentor' },
+		{
+			href: '/mentor/courses',
+			label: 'Courses',
+			match: (p) => p.startsWith('/mentor/courses')
+		},
+		{
+			href: '/mentor/machines',
+			label: 'Machine shop',
+			match: (p) => p.startsWith('/mentor/machines')
+		},
+		{ href: '/roster', label: 'Roster', match: (p) => p.startsWith('/roster') }
+	];
+
+	const adminNav: NavItem[] = [
+		{ href: '/admin', label: 'Admin home', match: (p) => p === '/admin' },
+		{ href: '/admin/settings', label: 'Workspace' },
+		{ href: '/admin/users', label: 'Users' },
+		{ href: '/admin/content', label: 'Content' },
+		{ href: '/admin/audit', label: 'Audit log' }
+	];
+
+	const isActive = (item: NavItem, p: string) =>
+		item.match ? item.match(p) : p === item.href;
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<div class="min-h-screen bg-slate-950 text-slate-100">
-	<header class="border-b border-slate-800 bg-slate-900/50">
-		<div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-			<a href="/" class="leading-tight">
-				<p class="font-semibold">Transfer</p>
-				<p class="text-xs text-slate-400">{data.orgName}</p>
+<div class="flex min-h-screen bg-white text-neutral-900">
+	<!-- Sidebar -->
+	<aside
+		class={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-neutral-200 bg-white transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+	>
+		<div class="flex items-center justify-between border-b border-neutral-200 px-5 py-5">
+			<a href="/dashboard" class="block leading-tight">
+				<p class="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-400">Transfer</p>
+				<p class="mt-0.5 text-sm font-semibold text-neutral-900">{data.orgName}</p>
 			</a>
-			<nav class="flex items-center gap-4 text-sm">
-				<a href="/dashboard" class={page.url.pathname === '/dashboard' ? 'text-yellow-300' : ''}
-					>Dashboard</a
+			<button
+				type="button"
+				class="rounded p-1 text-neutral-500 hover:bg-neutral-100 md:hidden"
+				aria-label="Close navigation"
+				onclick={() => (mobileOpen = false)}
+			>
+				<svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5"
+					><path
+						fill-rule="evenodd"
+						d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 1 0-1.06-1.06L10 8.94 5.28 4.22Z"
+						clip-rule="evenodd"
+					/></svg
 				>
-				<a href="/teams" class={page.url.pathname.startsWith('/teams') ? 'text-yellow-300' : ''}
-					>Teams</a
-				>
-				<a href="/profile" class={page.url.pathname.startsWith('/profile') ? 'text-yellow-300' : ''}
-					>Profile</a
-				>
-				{#if canMentor}
-					<a
-						href="/mentor"
-						class={page.url.pathname === '/mentor' ||
-						page.url.pathname === '/mentor/scan'
-							? 'text-yellow-300'
-							: ''}>Mentor</a
-					>
-					<a
-						href="/mentor/courses"
-						class={page.url.pathname.startsWith('/mentor/courses') ? 'text-yellow-300' : ''}
-						>Courses</a
-					>
-					<a
-						href="/mentor/machines"
-						class={page.url.pathname.startsWith('/mentor/machines') ? 'text-yellow-300' : ''}
-						>Machine Shop</a
-					>
-				{/if}
-				{#if canMentor}
-					<a href="/roster" class={page.url.pathname === '/roster' ? 'text-yellow-300' : ''}
-						>Roster</a
-					>
-				{/if}
-				{#if canAdmin}
-					<a href="/admin" class={page.url.pathname.startsWith('/admin') ? 'text-yellow-300' : ''}
-						>Admin</a
-					>
-				{/if}
-				<a href="/passport" class={page.url.pathname === '/passport' ? 'text-yellow-300' : ''}
-					>Passport</a
-				>
-				<a href="/scan" class={page.url.pathname.startsWith('/scan') ? 'text-yellow-300' : ''}
-					>Scan</a
-				>
-				{#if data.session}
-					<form method="POST" action="/auth/signout">
-						<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" type="submit"
-							>Sign out</button
-						>
-					</form>
-				{/if}
-			</nav>
+			</button>
 		</div>
-	</header>
-	<main class="mx-auto max-w-6xl p-4">{@render children()}</main>
+
+		<nav class="flex-1 overflow-y-auto px-3 py-4 text-sm">
+			<p class="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+				Workspace
+			</p>
+			<ul class="space-y-0.5">
+				{#each primary as item (item.href)}
+					<li>
+						<a
+							href={item.href}
+							onclick={() => (mobileOpen = false)}
+							class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+						>
+							{item.label}
+						</a>
+					</li>
+				{/each}
+			</ul>
+
+			{#if canMentor}
+				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+					Mentor
+				</p>
+				<ul class="space-y-0.5">
+					{#each mentorNav as item (item.href)}
+						<li>
+							<a
+								href={item.href}
+								onclick={() => (mobileOpen = false)}
+								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+							>
+								{item.label}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if canAdmin}
+				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+					Admin
+				</p>
+				<ul class="space-y-0.5">
+					{#each adminNav as item (item.href)}
+						<li>
+							<a
+								href={item.href}
+								onclick={() => (mobileOpen = false)}
+								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+							>
+								{item.label}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</nav>
+
+		{#if data.session && data.profile}
+			<div class="border-t border-neutral-200 p-3">
+				<a
+					href="/profile"
+					class="flex items-center gap-3 rounded-md p-2 hover:bg-neutral-100"
+				>
+					<Avatar
+						name={data.profile.full_name}
+						email={data.profile.email}
+						url={data.profile.avatar_url}
+						size="md"
+					/>
+					<div class="min-w-0 flex-1 leading-tight">
+						<p class="truncate text-sm font-medium text-neutral-900">
+							{data.profile.full_name || data.profile.email}
+						</p>
+						<p class="truncate text-[11px] uppercase tracking-wider text-neutral-400">
+							{data.profile.role.replace('_', ' ')}
+						</p>
+					</div>
+				</a>
+				<form method="POST" action="/auth/signout" class="mt-2">
+					<button
+						type="submit"
+						class="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+					>
+						Sign out
+					</button>
+				</form>
+			</div>
+		{/if}
+	</aside>
+
+	<!-- Scrim on mobile -->
+	{#if mobileOpen}
+		<button
+			class="fixed inset-0 z-30 bg-black/30 md:hidden"
+			aria-label="Close navigation"
+			onclick={() => (mobileOpen = false)}
+		></button>
+	{/if}
+
+	<div class="flex min-w-0 flex-1 flex-col">
+		<!-- Mobile top bar -->
+		<header
+			class="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 md:hidden"
+		>
+			<button
+				type="button"
+				class="rounded p-1 text-neutral-700 hover:bg-neutral-100"
+				aria-label="Open navigation"
+				onclick={() => (mobileOpen = true)}
+			>
+				<svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5"
+					><path
+						fill-rule="evenodd"
+						d="M3.75 5.25a.75.75 0 0 1 .75-.75h11a.75.75 0 0 1 0 1.5h-11a.75.75 0 0 1-.75-.75Zm0 4.75a.75.75 0 0 1 .75-.75h11a.75.75 0 0 1 0 1.5h-11a.75.75 0 0 1-.75-.75Zm.75 4a.75.75 0 0 0 0 1.5h11a.75.75 0 0 0 0-1.5h-11Z"
+						clip-rule="evenodd"
+					/></svg
+				>
+			</button>
+			<p class="text-sm font-semibold">Transfer · {data.orgName}</p>
+			{#if data.profile}
+				<a href="/profile">
+					<Avatar
+						name={data.profile.full_name}
+						email={data.profile.email}
+						url={data.profile.avatar_url}
+						size="sm"
+					/>
+				</a>
+			{:else}
+				<span class="w-8"></span>
+			{/if}
+		</header>
+
+		<main class="flex-1 px-6 py-8 md:px-10 md:py-10">
+			<div class="mx-auto w-full max-w-6xl">
+				{@render children()}
+			</div>
+		</main>
+	</div>
 </div>

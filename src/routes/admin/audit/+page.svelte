@@ -4,9 +4,9 @@
 
 <section class="space-y-4">
 	<h1 class="text-2xl font-semibold">Audit Log</h1>
-	<div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+	<div class="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
 		<table class="min-w-full text-sm">
-			<thead class="bg-slate-800 text-left">
+			<thead class="bg-neutral-100 text-left">
 				<tr>
 					<th class="p-2">When</th>
 					<th class="p-2">Action</th>
@@ -17,7 +17,7 @@
 			</thead>
 			<tbody>
 				{#each data.rows as row}
-					<tr class="border-t border-slate-800">
+					<tr class="border-t border-neutral-200">
 						<td class="p-2">{new Date(row.created_at).toLocaleString()}</td>
 						<td class="p-2">{row.action}</td>
 						<td class="p-2">{row.actor_id}</td>

@@ -79,7 +79,7 @@
 
 {#if hasGraphData}
 	<div
-		class="h-[480px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+		class="h-[480px] overflow-hidden rounded-xl border border-neutral-200 bg-white"
 		style="--xy-background-color:#020617;--xy-controls-button-background-color:#0f172a;--xy-controls-button-color:#cbd5e1;"
 	>
 		<SvelteFlow nodes={flowNodes} edges={flowEdges} fitView>
@@ -88,7 +88,7 @@
 		</SvelteFlow>
 	</div>
 {:else}
-	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+	<div class="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
 		No prerequisite graph to show yet.
 	</div>
 {/if}

@@ -14,6 +14,7 @@ declare global {
 					role: 'student' | 'student_lead' | 'mentor' | 'admin';
 					subteam_id: string | null;
 					bio: string;
+					avatar_url: string;
 				} | null;
 			}>;
 		}
@@ -27,6 +28,7 @@ declare global {
 				role: 'student' | 'student_lead' | 'mentor' | 'admin';
 				subteam_id: string | null;
 				bio: string;
+				avatar_url: string;
 			} | null;
 		}
 		// interface PageState {}

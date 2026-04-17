@@ -15,14 +15,16 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const fullName = String(form.get('full_name') ?? '').trim();
 		const bio = String(form.get('bio') ?? '').trim().slice(0, 500);
+		let avatarUrl = String(form.get('avatar_url') ?? '').trim().slice(0, 2048);
 
-		if (!fullName) {
-			return fail(400, { error: 'Display name is required.' });
+		if (!fullName) return fail(400, { error: 'Display name is required.' });
+		if (avatarUrl && !/^https?:\/\//i.test(avatarUrl)) {
+			return fail(400, { error: 'Avatar URL must start with http(s)://' });
 		}
 
 		const { error } = await locals.supabase
 			.from('profiles')
-			.update({ full_name: fullName, bio })
+			.update({ full_name: fullName, bio, avatar_url: avatarUrl })
 			.eq('id', user.id);
 		if (error) return fail(400, { error: error.message });
 

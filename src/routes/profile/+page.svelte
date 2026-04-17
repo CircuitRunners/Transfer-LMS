@@ -1,49 +1,102 @@
 <script lang="ts">
+	import Avatar from '$lib/components/Avatar.svelte';
+
 	let { data, form } = $props();
+
+	let fullName = $state('');
+	let bio = $state('');
+	let avatarUrl = $state('');
+	$effect(() => {
+		fullName = data.profile?.full_name ?? '';
+		bio = data.profile?.bio ?? '';
+		avatarUrl = data.profile?.avatar_url ?? '';
+	});
 </script>
 
-<section class="mx-auto max-w-3xl space-y-4">
-	<div>
-		<h1 class="text-2xl font-semibold">Profile customization</h1>
-		<p class="text-sm text-slate-400">
-			Set the name and short bio mentors and teammates should see.
+<section class="mx-auto max-w-3xl space-y-6">
+	<header>
+		<p class="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-400">Profile</p>
+		<h1 class="mt-1 text-3xl font-semibold tracking-tight">Your profile</h1>
+		<p class="mt-2 text-sm text-neutral-500">
+			How teammates and mentors see you across Transfer.
 		</p>
-	</div>
+	</header>
 
 	{#if form?.error}
-		<div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">{form.error}</div>
+		<div class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{form.error}</div>
 	{/if}
 	{#if form?.ok}
-		<div class="rounded border border-emerald-700 bg-emerald-900/30 p-3 text-sm text-emerald-200">
+		<div class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
 			Profile updated.
 		</div>
 	{/if}
 
-	<form method="POST" action="?/save" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-slate-300">Display name</span>
-			<input
-				name="full_name"
-				required
-				class="rounded bg-slate-800 px-2 py-2"
-				value={data.profile?.full_name ?? ''}
-				placeholder="Your name"
+	<div class="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+		<div class="flex items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-5 py-4">
+			<Avatar
+				name={fullName || data.profile?.email}
+				email={data.profile?.email}
+				url={avatarUrl}
+				size="xl"
 			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-slate-300">Bio (optional)</span>
-			<textarea
-				name="bio"
-				rows="4"
-				maxlength="500"
-				class="rounded bg-slate-800 px-2 py-2"
-				placeholder="A short intro, interests, or what you're focusing on this season."
-			>{data.profile?.bio ?? ''}</textarea>
-		</label>
-		<div class="flex justify-end">
-			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900">
-				Save profile
-			</button>
+			<div class="min-w-0">
+				<p class="truncate text-base font-semibold">{fullName || data.profile?.email}</p>
+				<p class="truncate text-xs uppercase tracking-wider text-neutral-500">
+					{data.profile?.role.replace('_', ' ')}
+				</p>
+				<p class="mt-1 truncate text-xs text-neutral-500">{data.profile?.email}</p>
+			</div>
 		</div>
-	</form>
+
+		<form method="POST" action="?/save" class="space-y-4 p-5">
+			<label class="block space-y-1">
+				<span class="text-xs font-medium uppercase tracking-wider text-neutral-500">
+					Display name
+				</span>
+				<input
+					name="full_name"
+					required
+					bind:value={fullName}
+					class="block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+					placeholder="Your name"
+				/>
+			</label>
+
+			<label class="block space-y-1">
+				<span class="text-xs font-medium uppercase tracking-wider text-neutral-500">
+					Avatar URL
+				</span>
+				<input
+					name="avatar_url"
+					bind:value={avatarUrl}
+					type="url"
+					class="block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+					placeholder="https://…"
+				/>
+				<span class="text-[11px] text-neutral-500">
+					Optional. Leave blank to use initials. Square images look best.
+				</span>
+			</label>
+
+			<label class="block space-y-1">
+				<span class="text-xs font-medium uppercase tracking-wider text-neutral-500">Bio</span>
+				<textarea
+					name="bio"
+					rows="4"
+					maxlength="500"
+					bind:value={bio}
+					class="block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+					placeholder="A short intro, interests, or what you're focusing on this season."
+				></textarea>
+			</label>
+
+			<div class="flex justify-end">
+				<button
+					class="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+				>
+					Save profile
+				</button>
+			</div>
+		</form>
+	</div>
 </section>

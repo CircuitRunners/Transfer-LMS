@@ -31,29 +31,29 @@
 
 <section class="space-y-4">
 	<h1 class="text-2xl font-semibold">Machine Access</h1>
-	<p class="text-sm text-slate-300">
+	<p class="text-sm text-neutral-700">
 		Scan the machine QR before use. You must have completed all required training courses.
 	</p>
-	{#if error}<p class="rounded border border-red-700 bg-red-900/30 p-2 text-sm text-red-100">{error}</p>{/if}
-	{#if success}<p class="rounded border border-emerald-700 bg-emerald-900/30 p-2 text-sm text-emerald-100">{success}</p>{/if}
+	{#if error}<p class="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>{/if}
+	{#if success}<p class="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">{success}</p>{/if}
 
 	<div class="grid gap-3 md:grid-cols-2">
-		<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+		<div class="rounded-xl border border-neutral-200 bg-white p-4">
 			<h2 class="mb-2 font-semibold">Scan machine QR</h2>
 			<QRScanner onDecoded={(v: string) => (token = v)} />
 		</div>
-		<div class="space-y-2 rounded-xl border border-slate-800 bg-slate-900 p-4">
+		<div class="space-y-2 rounded-xl border border-neutral-200 bg-white p-4">
 			<label class="flex flex-col gap-1 text-sm">
 				<span>Machine token</span>
-				<input class="rounded bg-slate-800 px-2 py-2" bind:value={token} />
+				<input class="rounded bg-neutral-100 px-2 py-2" bind:value={token} />
 			</label>
 			<button class="rounded bg-yellow-400 px-3 py-2 text-sm font-semibold text-slate-900" onclick={useMachine}>
 				Authorize machine use
 			</button>
 			{#if machine}
-				<div class="rounded bg-slate-950/50 p-2 text-sm">
+				<div class="rounded bg-neutral-50 p-2 text-sm">
 					<p class="font-semibold">{machine.name}</p>
-					<p class="text-slate-300">{machine.description || 'No description.'}</p>
+					<p class="text-neutral-700">{machine.description || 'No description.'}</p>
 				</div>
 			{/if}
 		</div>
