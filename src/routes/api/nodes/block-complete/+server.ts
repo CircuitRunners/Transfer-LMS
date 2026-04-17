@@ -9,7 +9,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'nodeId and blockId are required' }, { status: 400 });
 	}
 
-	const [{ data: blocks }, { data: cert }] = await Promise.all([
+	const [{ data: blocks }, { data: cert }, { data: computed }] = await Promise.all([
 		locals.supabase
 			.from('node_blocks')
 			.select('id,position,type')
@@ -20,10 +20,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			.select('status')
 			.eq('node_id', nodeId)
 			.eq('user_id', user.id)
+			.maybeSingle(),
+		locals.supabase
+			.from('v_user_node_status')
+			.select('computed_status')
+			.eq('node_id', nodeId)
+			.eq('user_id', user.id)
 			.maybeSingle()
 	]);
 	if (!cert) return json({ error: 'Certification missing' }, { status: 400 });
-	if (cert.status === 'locked') {
+	const effectiveStatus = String(computed?.computed_status ?? cert?.status ?? 'locked');
+	if (effectiveStatus === 'locked') {
 		return json({ error: 'Complete prerequisites first.' }, { status: 400 });
 	}
 
