@@ -55,34 +55,6 @@ export const ATTENDANCE_PUBLIC_DISPLAY_KEY = 'public-attendance-display';
 export const ATTENDANCE_PUBLIC_ACTIVATION_QR = 'attendance_activate_public_v1';
 export type AttendanceAudience = 'students' | 'mentors';
 
-export const createAttendanceAccessToken = async (attendeeUserId: string, issuedBy: string) =>
-	new SignJWT({ kind: 'attendance_access', attendee_user_id: attendeeUserId, issued_by: issuedBy })
-		.setProtectedHeader({ alg: 'HS256' })
-		.setIssuedAt()
-		.setExpirationTime('30d')
-		.sign(attendanceSecret());
-
-export const verifyAttendanceAccessToken = async (token: string) => {
-	const { payload } = await jwtVerify(token, attendanceSecret());
-	if (String(payload.kind ?? '') !== 'attendance_access') throw new Error('Invalid attendance access token');
-	const attendeeUserId = String(payload.attendee_user_id ?? '');
-	if (!attendeeUserId) throw new Error('Invalid attendance access token');
-	return { attendeeUserId };
-};
-
-export const createAttendanceHourlyToken = async (attendeeUserId: string) => {
-	const bucket = attendanceHourBucket();
-	return new SignJWT({
-		kind: 'attendance_hourly',
-		attendee_user_id: attendeeUserId,
-		bucket
-	})
-		.setProtectedHeader({ alg: 'HS256' })
-		.setIssuedAt()
-		.setExpirationTime('65m')
-		.sign(attendanceSecret());
-};
-
 export const createAttendancePublicHourlyToken = async (audience: AttendanceAudience) => {
 	const bucket = attendanceHourBucket();
 	return new SignJWT({
@@ -96,24 +68,6 @@ export const createAttendancePublicHourlyToken = async (audience: AttendanceAudi
 		.sign(attendanceSecret());
 };
 
-export const createAttendanceActivationToken = async (accessToken: string) =>
-	new SignJWT({
-		kind: 'attendance_activate',
-		access_token: accessToken
-	})
-		.setProtectedHeader({ alg: 'HS256' })
-		.setIssuedAt()
-		.setExpirationTime('30d')
-		.sign(attendanceSecret());
-
-export const verifyAttendanceHourlyToken = async (token: string) => {
-	const { payload } = await jwtVerify(token, attendanceSecret());
-	if (String(payload.kind ?? '') !== 'attendance_hourly') throw new Error('Invalid attendance QR token');
-	const attendeeUserId = String(payload.attendee_user_id ?? '');
-	if (!attendeeUserId) throw new Error('Invalid attendance QR token');
-	return { attendeeUserId };
-};
-
 export const verifyAttendancePublicHourlyToken = async (token: string) => {
 	const { payload } = await jwtVerify(token, attendanceSecret());
 	if (String(payload.kind ?? '') !== 'attendance_public_hourly') {
@@ -124,12 +78,4 @@ export const verifyAttendancePublicHourlyToken = async (token: string) => {
 		throw new Error('Invalid attendance QR token');
 	}
 	return { bucket: String(payload.bucket ?? ''), audience: audience as AttendanceAudience };
-};
-
-export const verifyAttendanceActivationToken = async (token: string) => {
-	const { payload } = await jwtVerify(token, attendanceSecret());
-	if (String(payload.kind ?? '') !== 'attendance_activate') throw new Error('Invalid attendance activation token');
-	const accessToken = String(payload.access_token ?? '');
-	if (!accessToken) throw new Error('Invalid attendance activation token');
-	return { accessToken };
 };

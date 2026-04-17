@@ -8,7 +8,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const [{ data: sessions }, { data: displays }] = await Promise.all([
 		locals.supabase
 			.from('attendance_daily_sessions')
-			.select('id,attendee_user_id,attendance_day,check_in_at,check_out_at,last_scanned_by,created_at'),
+			.select('id,attendee_user_id,attendance_day,check_in_at,check_out_at,last_scanned_by,created_at')
+			.order('attendance_day', { ascending: false })
+			.order('check_in_at', { ascending: false })
+			.limit(500),
 		locals.supabase
 			.from('attendance_display_sessions')
 			.select('id,attendee_user_id,activated_at,activated_by,created_at')
