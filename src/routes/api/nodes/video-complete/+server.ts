@@ -6,6 +6,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const { nodeId, segmentId } = await request.json();
 	if (!nodeId) return json({ error: 'nodeId required' }, { status: 400 });
+	const { data: cert } = await locals.supabase
+		.from('certifications')
+		.select('status')
+		.eq('node_id', nodeId)
+		.eq('user_id', user.id)
+		.maybeSingle();
+	if (!cert) return json({ error: 'Certification missing' }, { status: 400 });
+	if (cert.status === 'locked') {
+		return json({ error: 'Complete prerequisites first.' }, { status: 400 });
+	}
+	if (cert.status === 'completed') {
+		return json({ error: 'This module is already completed.' }, { status: 409 });
+	}
 
 	if (segmentId) {
 		const { data: segments } = await locals.supabase

@@ -179,7 +179,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		if (checkoffBlock?.id) {
 			const { error: progressErr } = await locals.supabase.from('user_node_block_progress').upsert(
 				{
-					user_id: userId,
 					user_id: resolvedUserId,
 					node_id: resolvedNodeId,
 					block_id: checkoffBlock.id,
@@ -195,7 +194,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 		if (checkoffBlock?.id) {
 			const { data: autoCert, error: autoErr } = await locals.supabase.rpc('try_auto_complete_node', {
-				p_node_id: nodeId,
 				p_node_id: resolvedNodeId,
 				p_target_user_id: resolvedUserId
 			});
