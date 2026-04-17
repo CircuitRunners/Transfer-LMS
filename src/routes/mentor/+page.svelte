@@ -192,62 +192,62 @@
 		<div class="flex items-center gap-2">
 			<a
 				href="/scan"
-				class="rounded border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100"
+				class="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
 				>Scan hub</a
 			>
 			<a
 				href="/mentor/courses"
-				class="rounded bg-neutral-200 px-3 py-2 text-sm hover:bg-neutral-300"
+				class="rounded bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600"
 				>Manage courses →</a
 			>
 		</div>
 	</div>
 	{#if data.error || actionError}
-		<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+		<div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
 			{data.error || actionError}
 		</div>
 	{/if}
-	<div class="rounded-xl border border-neutral-200 bg-white p-3">
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-3">
 		<form method="GET" class="flex flex-wrap items-center gap-2">
-			<label for="scope" class="text-xs text-neutral-500">Scope</label>
-			<select id="scope" name="scope" class="rounded bg-neutral-100 px-2 py-1.5 text-sm">
+			<label for="scope" class="text-xs text-slate-400">Scope</label>
+			<select id="scope" name="scope" class="rounded bg-slate-800 px-2 py-1.5 text-sm">
 				<option value="mine" selected={data.scope === 'mine'}>My teams</option>
 				<option value="all" selected={data.scope === 'all'}>All teams</option>
 			</select>
-			<select name="team" class="rounded bg-neutral-100 px-2 py-1.5 text-sm">
+			<select name="team" class="rounded bg-slate-800 px-2 py-1.5 text-sm">
 				<option value="">All course teams</option>
 				{#each data.subteams as team}
 					<option value={team.id} selected={team.id === data.selectedTeamId}>{team.name}</option>
 				{/each}
 			</select>
-			<button class="rounded bg-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-300" type="submit"
+			<button class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600" type="submit"
 				>Apply</button
 			>
-			<a href="/mentor" class="rounded border border-neutral-200 px-3 py-1.5 text-sm">Reset</a>
+			<a href="/mentor" class="rounded border border-slate-800 px-3 py-1.5 text-sm">Reset</a>
 			<a href="/teams" class="ml-auto text-xs text-yellow-300 underline">Edit team preferences</a>
 		</form>
 		{#if data.scope === 'mine' && data.mentorTeamIds?.length === 0}
-			<p class="mt-2 text-xs text-amber-800">
+			<p class="mt-2 text-xs text-amber-200">
 				No mentor teams selected yet, so "My teams" currently shows all checkoffs.
 			</p>
 		{/if}
 	</div>
 	<div class="grid gap-2 md:grid-cols-3">
-		<div class="rounded border border-neutral-200 bg-white p-3 text-sm">
-			<p class="text-xs text-neutral-500">Pending</p>
+		<div class="rounded border border-slate-800 bg-slate-900 p-3 text-sm">
+			<p class="text-xs text-slate-400">Pending</p>
 			<p class="text-xl font-semibold">{summary.total}</p>
 		</div>
-		<div class="rounded border border-neutral-200 bg-white p-3 text-sm">
-			<p class="text-xs text-neutral-500">With evidence</p>
-			<p class="text-xl font-semibold text-emerald-800">{summary.withEvidence}</p>
+		<div class="rounded border border-slate-800 bg-slate-900 p-3 text-sm">
+			<p class="text-xs text-slate-400">With evidence</p>
+			<p class="text-xl font-semibold text-emerald-200">{summary.withEvidence}</p>
 		</div>
-		<div class="rounded border border-neutral-200 bg-white p-3 text-sm">
-			<p class="text-xs text-neutral-500">Missing required evidence</p>
-			<p class="text-xl font-semibold text-amber-800">{summary.needsEvidence}</p>
+		<div class="rounded border border-slate-800 bg-slate-900 p-3 text-sm">
+			<p class="text-xs text-slate-400">Missing required evidence</p>
+			<p class="text-xl font-semibold text-amber-200">{summary.needsEvidence}</p>
 		</div>
 	</div>
 	{#if !queue.length}
-		<p class="text-neutral-700">No students are waiting for checkoff.</p>
+		<p class="text-slate-300">No students are waiting for checkoff.</p>
 	{:else}
 		<div class="grid gap-3 md:grid-cols-2">
 			{#each queue as item}
@@ -264,22 +264,22 @@
 		</div>
 	{/if}
 
-	<div class="rounded-xl border border-neutral-200 bg-white p-4">
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<div class="mb-2 flex items-center justify-between">
 			<h2 class="text-lg font-semibold">Past Checkoffs</h2>
-			<span class="text-xs text-neutral-500">Most recent first</span>
+			<span class="text-xs text-slate-400">Most recent first</span>
 		</div>
 		<ul class="space-y-2 text-sm">
 			{#each data.history as h}
-				<li class="rounded border border-neutral-200 bg-white/40 p-2">
+				<li class="rounded border border-slate-800 bg-slate-900/40 p-2">
 					<div class="flex items-center justify-between gap-2">
 						<p>
 							<span class="font-medium">{h.user?.full_name || h.user?.email}</span>
 							· {h.node?.title}
 						</p>
-						<span class="text-xs text-neutral-500">{new Date(h.updated_at).toLocaleString()}</span>
+						<span class="text-xs text-slate-400">{new Date(h.updated_at).toLocaleString()}</span>
 					</div>
-					<p class="mt-1 text-xs text-neutral-500">
+					<p class="mt-1 text-xs text-slate-400">
 						{h.kind === 'approved'
 							? 'Approved'
 							: h.kind === 'blocked'
@@ -289,41 +289,41 @@
 									: 'Status update'}
 					</p>
 					{#if getHistoryNotes(h)}
-						<p class="mt-1 text-xs text-neutral-700">{getHistoryNotes(h)}</p>
+						<p class="mt-1 text-xs text-slate-300">{getHistoryNotes(h)}</p>
 					{/if}
 				</li>
 			{:else}
-				<li class="text-neutral-500">No past checkoffs yet.</li>
+				<li class="text-slate-400">No past checkoffs yet.</li>
 			{/each}
 		</ul>
 	</div>
 
 	{#if selectedItem}
 		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-			<div class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-neutral-200 bg-white p-4">
+			<div class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-slate-800 bg-slate-900 p-4">
 				<div class="mb-3 flex items-center justify-between">
 					<h2 class="text-lg font-semibold">Full Review</h2>
-					<button class="rounded border border-neutral-200 px-3 py-1 text-sm" onclick={() => (selectedItem = null)}
+					<button class="rounded border border-slate-800 px-3 py-1 text-sm" onclick={() => (selectedItem = null)}
 						>Close</button
 					>
 				</div>
-				<div class="mb-3 rounded border border-neutral-200 bg-white p-3">
-					<p class="mb-2 text-xs text-neutral-500">Required: scan this student's passport before action</p>
+				<div class="mb-3 rounded border border-slate-800 bg-slate-900 p-3">
+					<p class="mb-2 text-xs text-slate-400">Required: scan this student's passport before action</p>
 					<div class="grid gap-3 md:grid-cols-2">
-						<div class="rounded bg-white/60 p-2">
+						<div class="rounded bg-slate-900/60 p-2">
 							<QRScanner onDecoded={onDecodedForCheckoff} />
 						</div>
-						<div class="text-sm text-neutral-700">
+						<div class="text-sm text-slate-300">
 							<p>Selected student: {selectedItem.profile?.full_name || selectedItem.profile?.email}</p>
 							<p>
 								Scanned student id: {scannedStudentId || '—'}
 								{#if scannedStudentId === selectedItem.user_id}
-									<span class="ml-2 text-emerald-700">match</span>
+									<span class="ml-2 text-emerald-300">match</span>
 								{:else if scannedStudentId}
-									<span class="ml-2 text-red-700">mismatch</span>
+									<span class="ml-2 text-red-300">mismatch</span>
 								{/if}
 							</p>
-							{#if scanMessage}<p class="mt-1 text-xs text-neutral-500">{scanMessage}</p>{/if}
+							{#if scanMessage}<p class="mt-1 text-xs text-slate-400">{scanMessage}</p>{/if}
 						</div>
 					</div>
 				</div>

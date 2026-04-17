@@ -272,9 +272,9 @@
 	}
 
 	function blockStyles(type: BlockType) {
-		if (type === 'video') return 'border-sky-200/60 bg-sky-950/30';
+		if (type === 'video') return 'border-sky-700/60 bg-sky-950/30';
 		if (type === 'quiz') return 'border-yellow-700/60 bg-yellow-950/20';
-		return 'border-emerald-200/60 bg-emerald-950/20';
+		return 'border-emerald-700/60 bg-emerald-950/20';
 	}
 	function blockLabel(type: BlockType) {
 		if (type === 'video') return 'Video';
@@ -299,22 +299,22 @@
 <section class="space-y-6">
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div>
-			<a href="/mentor/courses" class="text-xs text-neutral-500">← All courses</a>
+			<a href="/mentor/courses" class="text-xs text-slate-400">← All courses</a>
 			<h1 class="text-2xl font-semibold">{data.node.title}</h1>
-			<p class="text-xs text-neutral-500">
-				<code class="rounded bg-neutral-100 px-1 py-0.5">{data.node.slug}</code>
+			<p class="text-xs text-slate-400">
+				<code class="rounded bg-slate-800 px-1 py-0.5">{data.node.slug}</code>
 			</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<a
 				href={`/learn/${data.node.slug}`}
-				class="rounded border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-100"
+				class="rounded border border-slate-800 px-3 py-2 text-sm hover:bg-slate-800"
 				>Preview as student</a
 			>
 			<form method="POST" action="?/deleteNode" onsubmit={handleDeleteSubmit}>
 				<button
 					type="submit"
-					class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 hover:bg-red-900/60"
+					class="rounded border border-red-700 bg-red-900/30 px-3 py-2 text-sm text-red-200 hover:bg-red-900/60"
 				>
 					Delete
 				</button>
@@ -325,8 +325,8 @@
 	{#if message}
 		<div
 			class="rounded border p-3 text-sm {message.tone === 'error'
-				? 'border-red-200 bg-red-50 text-red-800'
-				: 'border-emerald-200 bg-emerald-50 text-emerald-800'}"
+				? 'border-red-700 bg-red-900/30 text-red-200'
+				: 'border-emerald-700 bg-emerald-900/30 text-emerald-200'}"
 		>
 			{message.text}
 		</div>
@@ -335,32 +335,32 @@
 	<form
 		method="POST"
 		action="?/updateNode"
-		class="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 md:grid-cols-2"
+		class="grid gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 md:grid-cols-2"
 	>
 		<h2 class="text-lg font-semibold md:col-span-2">Details</h2>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-neutral-700">Title</span>
-			<input class="rounded bg-neutral-100 px-2 py-2" name="title" value={data.node.title} required />
+			<span class="text-slate-300">Title</span>
+			<input class="rounded bg-slate-800 px-2 py-2" name="title" value={data.node.title} required />
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-neutral-700">Slug</span>
-			<input class="rounded bg-neutral-100 px-2 py-2" name="slug" value={data.node.slug} required />
+			<span class="text-slate-300">Slug</span>
+			<input class="rounded bg-slate-800 px-2 py-2" name="slug" value={data.node.slug} required />
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-neutral-700">Subteam</span>
-			<select class="rounded bg-neutral-100 px-2 py-2" name="subteam_id" required>
+			<span class="text-slate-300">Subteam</span>
+			<select class="rounded bg-slate-800 px-2 py-2" name="subteam_id" required>
 				{#each data.subteams as team}
 					<option value={team.id} selected={team.id === data.node.subteam_id}>{team.name}</option>
 				{/each}
 			</select>
 		</label>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-neutral-700">Fallback video URL (used if no video blocks yet)</span>
-			<input class="rounded bg-neutral-100 px-2 py-2" name="video_url" value={data.node.video_url ?? ''} />
+			<span class="text-slate-300">Fallback video URL (used if no video blocks yet)</span>
+			<input class="rounded bg-slate-800 px-2 py-2" name="video_url" value={data.node.video_url ?? ''} />
 		</label>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-neutral-700">Description</span>
-			<textarea class="rounded bg-neutral-100 px-2 py-2" name="description" rows="3"
+			<span class="text-slate-300">Description</span>
+			<textarea class="rounded bg-slate-800 px-2 py-2" name="description" rows="3"
 				>{data.node.description ?? ''}</textarea
 			>
 		</label>
@@ -374,19 +374,19 @@
 	<form
 		method="POST"
 		action="?/saveBlocks"
-		class="space-y-4 rounded-xl border border-neutral-200 bg-white p-4"
+		class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-4"
 	>
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<div>
 				<h2 class="text-lg font-semibold">Course Builder</h2>
-				<p class="text-xs text-neutral-500">
+				<p class="text-xs text-slate-400">
 					Compose this course from ordered blocks. Students complete each block in sequence.
 				</p>
 			</div>
 			<div class="flex flex-wrap gap-2">
 				<button
 					type="button"
-					class="rounded border border-sky-200/60 bg-sky-950/40 px-3 py-1 text-sm hover:bg-sky-50"
+					class="rounded border border-sky-700/60 bg-sky-950/40 px-3 py-1 text-sm hover:bg-sky-900/30"
 					onclick={() => addBlock('video')}
 				>
 					+ Video
@@ -400,7 +400,7 @@
 				</button>
 				<button
 					type="button"
-					class="rounded border border-emerald-200/60 bg-emerald-950/40 px-3 py-1 text-sm hover:bg-emerald-50"
+					class="rounded border border-emerald-700/60 bg-emerald-950/40 px-3 py-1 text-sm hover:bg-emerald-900/30"
 					onclick={() => addBlock('checkoff')}
 				>
 					+ Checkoff
@@ -413,14 +413,14 @@
 			{#each blocks as block, i (block.id ?? i)}
 				<div class="rounded border p-3 {blockStyles(block.type)} {blockErrors[i] ? 'ring-1 ring-red-500' : ''}">
 					<div class="flex flex-wrap items-center gap-2">
-						<span class="inline-flex items-center rounded bg-neutral-50 px-2 py-0.5 text-xs font-semibold">
+						<span class="inline-flex items-center rounded bg-slate-900/50 px-2 py-0.5 text-xs font-semibold">
 							{i + 1}. {blockLabel(block.type)}
 						</span>
-						<p class="truncate text-sm text-neutral-800">{blockSummary(block)}</p>
+						<p class="truncate text-sm text-slate-200">{blockSummary(block)}</p>
 						<div class="ml-auto flex items-center gap-1">
 							<button
 								type="button"
-								class="rounded border border-neutral-200 px-2 py-0.5 text-xs disabled:opacity-40"
+								class="rounded border border-slate-800 px-2 py-0.5 text-xs disabled:opacity-40"
 								disabled={i === 0}
 								onclick={() => moveBlock(i, -1)}
 								title="Move up"
@@ -428,7 +428,7 @@
 							>▲</button>
 							<button
 								type="button"
-								class="rounded border border-neutral-200 px-2 py-0.5 text-xs disabled:opacity-40"
+								class="rounded border border-slate-800 px-2 py-0.5 text-xs disabled:opacity-40"
 								disabled={i === blocks.length - 1}
 								onclick={() => moveBlock(i, 1)}
 								title="Move down"
@@ -436,48 +436,48 @@
 							>▼</button>
 							<button
 								type="button"
-								class="rounded border border-neutral-200 px-2 py-0.5 text-xs"
+								class="rounded border border-slate-800 px-2 py-0.5 text-xs"
 								onclick={() => (expandedIndex = expandedIndex === i ? null : i)}
 							>
 								{expandedIndex === i ? 'Collapse' : 'Edit'}
 							</button>
 							<button
 								type="button"
-								class="rounded border border-red-200/60 px-2 py-0.5 text-xs text-red-800"
+								class="rounded border border-red-700/60 px-2 py-0.5 text-xs text-red-200"
 								onclick={() => removeBlock(i)}
 							>Remove</button>
 						</div>
 					</div>
 
 					{#if expandedIndex === i}
-						<div class="mt-3 space-y-3 rounded bg-white/60 p-3">
+						<div class="mt-3 space-y-3 rounded bg-slate-900/60 p-3">
 							{#if blockErrors[i]}
-								<p class="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+								<p class="rounded border border-red-700 bg-red-900/30 p-2 text-xs text-red-200">
 									{blockErrors[i]}
 								</p>
 							{/if}
 							{#if block.type === 'video'}
 								<div class="grid gap-2 md:grid-cols-2">
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Title (shown to students)</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="e.g. Intro to Pneumatics" />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="e.g. Intro to Pneumatics" />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>YouTube URL</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={block.config.video_url} placeholder="https://www.youtube.com/watch?v=..." />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.video_url} placeholder="https://www.youtube.com/watch?v=..." />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Start time (mm:ss)</span>
 										<input
-											class="rounded bg-neutral-100 px-2 py-2 text-sm"
+											class="rounded bg-slate-800 px-2 py-2 text-sm"
 											value={formatClock(block.config.start_seconds)}
 											onchange={(e) => (block.config.start_seconds = parseClock((e.currentTarget as HTMLInputElement).value))}
 										/>
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>End time (mm:ss, optional)</span>
 										<input
-											class="rounded bg-neutral-100 px-2 py-2 text-sm"
+											class="rounded bg-slate-800 px-2 py-2 text-sm"
 											placeholder="e.g. 12:30"
 											value={block.config.end_seconds == null ? '' : formatClock(block.config.end_seconds)}
 											onchange={(e) => {
@@ -489,49 +489,49 @@
 								</div>
 							{:else if block.type === 'quiz'}
 								<div class="grid gap-2 md:grid-cols-2">
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Title</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="Quiz name (optional)" />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="Quiz name (optional)" />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Passing score (%)</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="1" max="100" bind:value={block.config.passing_score} />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="100" bind:value={block.config.passing_score} />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Min seconds between attempts</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="0" max="3600" bind:value={block.config.min_seconds_between_attempts} />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="0" max="3600" bind:value={block.config.min_seconds_between_attempts} />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Failed-attempt window (minutes)</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="1" max="1440" bind:value={block.config.fail_window_minutes} />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="1440" bind:value={block.config.fail_window_minutes} />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Max failed in window</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="1" max="200" bind:value={block.config.max_failed_in_window} />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="200" bind:value={block.config.max_failed_in_window} />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Short answer min / max chars</span>
 										<div class="flex gap-2">
-											<input class="w-full rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="0" max="5000" bind:value={block.config.short_answer_min_chars} />
-											<input class="w-full rounded bg-neutral-100 px-2 py-2 text-sm" type="number" min="1" max="5000" bind:value={block.config.short_answer_max_chars} />
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="0" max="5000" bind:value={block.config.short_answer_min_chars} />
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="5000" bind:value={block.config.short_answer_max_chars} />
 										</div>
 									</label>
 								</div>
 
 								<div class="space-y-2">
 									<div class="flex items-center justify-between">
-										<p class="text-xs font-semibold text-neutral-700">Questions</p>
-										<button type="button" class="rounded border border-neutral-200 px-2 py-1 text-xs" onclick={() => addQuizQuestion(block)}>+ Add question</button>
+										<p class="text-xs font-semibold text-slate-300">Questions</p>
+										<button type="button" class="rounded border border-slate-800 px-2 py-1 text-xs" onclick={() => addQuizQuestion(block)}>+ Add question</button>
 									</div>
 									{#each block.config.questions as q, qIdx (qIdx)}
-										<div class="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-2">
+										<div class="space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2">
 											<div class="flex items-center justify-between">
-												<span class="text-xs text-neutral-500">Q{qIdx + 1}</span>
-												<button type="button" class="text-xs text-red-700" onclick={() => removeQuizQuestion(block, qIdx)}>Remove</button>
+												<span class="text-xs text-slate-400">Q{qIdx + 1}</span>
+												<button type="button" class="text-xs text-red-300" onclick={() => removeQuizQuestion(block, qIdx)}>Remove</button>
 											</div>
-											<input class="w-full rounded bg-neutral-100 px-2 py-2 text-sm" placeholder="Question prompt" bind:value={q.prompt} />
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" placeholder="Question prompt" bind:value={q.prompt} />
 											<div class="flex items-center gap-2">
-												<select class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={q.type} onchange={() => onQuestionTypeChange(q)}>
+												<select class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={q.type} onchange={() => onQuestionTypeChange(q)}>
 													<option value="mc">Multiple choice</option>
 													<option value="tf">True / False</option>
 													<option value="short">Short answer</option>
@@ -547,39 +547,39 @@
 																checked={q.correct !== '' && q.correct === q.options![oi]}
 																onchange={() => (q.correct = q.options![oi])}
 															/>
-															<input class="flex-1 rounded bg-neutral-100 px-2 py-1 text-sm" placeholder={`Option ${oi + 1}`} bind:value={q.options![oi]} />
+															<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" placeholder={`Option ${oi + 1}`} bind:value={q.options![oi]} />
 														</div>
 													{/each}
 													<div class="flex gap-2 pt-1">
-														<button type="button" class="rounded border border-neutral-200 px-2 py-0.5 text-xs" onclick={() => (q.options = [...(q.options ?? []), ''])}>+ Option</button>
+														<button type="button" class="rounded border border-slate-800 px-2 py-0.5 text-xs" onclick={() => (q.options = [...(q.options ?? []), ''])}>+ Option</button>
 													</div>
 												</div>
 											{:else if q.type === 'tf'}
-												<div class="inline-flex overflow-hidden rounded border border-neutral-200">
-													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'true' ? 'bg-yellow-400 text-slate-900' : 'bg-neutral-100 text-neutral-800'}`} onclick={() => (q.correct = 'true')}>True</button>
-													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'false' ? 'bg-yellow-400 text-slate-900' : 'bg-neutral-100 text-neutral-800'}`} onclick={() => (q.correct = 'false')}>False</button>
+												<div class="inline-flex overflow-hidden rounded border border-slate-800">
+													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'true' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200'}`} onclick={() => (q.correct = 'true')}>True</button>
+													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'false' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200'}`} onclick={() => (q.correct = 'false')}>False</button>
 												</div>
 											{:else}
-												<input class="w-full rounded bg-neutral-100 px-2 py-2 text-sm" placeholder="Expected answer" bind:value={q.correct} />
+												<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" placeholder="Expected answer" bind:value={q.correct} />
 											{/if}
 										</div>
 									{:else}
-										<p class="text-xs text-neutral-400">No questions yet.</p>
+										<p class="text-xs text-slate-500">No questions yet.</p>
 									{/each}
 								</div>
 							{:else}
 								<div class="grid gap-2 md:grid-cols-2">
-									<label class="flex flex-col gap-1 text-xs text-neutral-500 md:col-span-2">
+									<label class="flex flex-col gap-1 text-xs text-slate-400 md:col-span-2">
 										<span>Section title</span>
-										<input class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={block.config.title} />
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} />
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500 md:col-span-2">
+									<label class="flex flex-col gap-1 text-xs text-slate-400 md:col-span-2">
 										<span>Student directions</span>
-										<textarea class="rounded bg-neutral-100 px-2 py-2 text-sm" rows="3" bind:value={block.config.directions} placeholder="Explain exactly what they must demo or submit..."></textarea>
+										<textarea class="rounded bg-slate-800 px-2 py-2 text-sm" rows="3" bind:value={block.config.directions} placeholder="Explain exactly what they must demo or submit..."></textarea>
 									</label>
-									<label class="flex flex-col gap-1 text-xs text-neutral-500">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
 										<span>Photo evidence</span>
-										<select class="rounded bg-neutral-100 px-2 py-2 text-sm" bind:value={block.config.evidence_mode}>
+										<select class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.evidence_mode}>
 											<option value="none">No photo</option>
 											<option value="photo_optional">Photo optional</option>
 											<option value="photo_required">Photo required</option>
@@ -588,32 +588,32 @@
 								</div>
 
 								<div class="grid gap-3 md:grid-cols-2">
-									<div class="rounded border border-neutral-200 bg-neutral-50 p-2">
+									<div class="rounded border border-slate-800 bg-slate-900/50 p-2">
 										<div class="mb-1 flex items-center justify-between">
-											<p class="text-xs font-semibold text-neutral-700">Mentor checklist</p>
-											<button type="button" class="rounded border border-neutral-200 px-2 py-0.5 text-xs" onclick={() => addChecklistItem(block)}>+ Item</button>
+											<p class="text-xs font-semibold text-slate-300">Mentor checklist</p>
+											<button type="button" class="rounded border border-slate-800 px-2 py-0.5 text-xs" onclick={() => addChecklistItem(block)}>+ Item</button>
 										</div>
 										{#each block.config.mentor_checklist as _item, idx (idx)}
 											<div class="flex items-center gap-1">
-												<input class="flex-1 rounded bg-neutral-100 px-2 py-1 text-sm" bind:value={block.config.mentor_checklist[idx]} placeholder="e.g. Safety glasses worn" />
-												<button type="button" class="px-2 text-xs text-red-700" onclick={() => removeChecklistItem(block, idx)}>×</button>
+												<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" bind:value={block.config.mentor_checklist[idx]} placeholder="e.g. Safety glasses worn" />
+												<button type="button" class="px-2 text-xs text-red-300" onclick={() => removeChecklistItem(block, idx)}>×</button>
 											</div>
 										{:else}
-											<p class="text-xs text-neutral-400">No checklist items yet.</p>
+											<p class="text-xs text-slate-500">No checklist items yet.</p>
 										{/each}
 									</div>
-									<div class="rounded border border-neutral-200 bg-neutral-50 p-2">
+									<div class="rounded border border-slate-800 bg-slate-900/50 p-2">
 										<div class="mb-1 flex items-center justify-between">
-											<p class="text-xs font-semibold text-neutral-700">Resource links</p>
-											<button type="button" class="rounded border border-neutral-200 px-2 py-0.5 text-xs" onclick={() => addResourceLink(block)}>+ Link</button>
+											<p class="text-xs font-semibold text-slate-300">Resource links</p>
+											<button type="button" class="rounded border border-slate-800 px-2 py-0.5 text-xs" onclick={() => addResourceLink(block)}>+ Link</button>
 										</div>
 										{#each block.config.resource_links as _link, idx (idx)}
 											<div class="flex items-center gap-1">
-												<input class="flex-1 rounded bg-neutral-100 px-2 py-1 text-sm" bind:value={block.config.resource_links[idx]} placeholder="https://..." />
-												<button type="button" class="px-2 text-xs text-red-700" onclick={() => removeResourceLink(block, idx)}>×</button>
+												<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" bind:value={block.config.resource_links[idx]} placeholder="https://..." />
+												<button type="button" class="px-2 text-xs text-red-300" onclick={() => removeResourceLink(block, idx)}>×</button>
 											</div>
 										{:else}
-											<p class="text-xs text-neutral-400">No links yet.</p>
+											<p class="text-xs text-slate-500">No links yet.</p>
 										{/each}
 									</div>
 								</div>
@@ -622,7 +622,7 @@
 					{/if}
 				</div>
 			{:else}
-				<div class="rounded border border-dashed border-neutral-200 p-6 text-center text-sm text-neutral-500">
+				<div class="rounded border border-dashed border-slate-800 p-6 text-center text-sm text-slate-400">
 					No blocks yet. Use the buttons above to add a video, quiz, or checkoff.
 				</div>
 			{/each}
@@ -635,27 +635,27 @@
 		</div>
 	</form>
 
-	<form method="POST" action="?/savePrereqs" class="space-y-3 rounded-xl border border-neutral-200 bg-white p-4">
+	<form method="POST" action="?/savePrereqs" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<div>
 			<h2 class="text-lg font-semibold">Prerequisites</h2>
-			<p class="text-xs text-neutral-500">
+			<p class="text-xs text-slate-400">
 				Students must complete these courses before starting this one.
 			</p>
 		</div>
 		<input
 			bind:value={prereqFilter}
 			placeholder="Filter by title or slug..."
-			class="w-full rounded bg-neutral-100 px-2 py-2 text-sm"
+			class="w-full rounded bg-slate-800 px-2 py-2 text-sm"
 		/>
 		<div class="grid max-h-80 gap-1 overflow-y-auto md:grid-cols-2">
 			{#each filteredNodes as n (n.id)}
-				<label class="flex items-center gap-2 rounded border border-neutral-200 px-2 py-1 text-sm hover:bg-neutral-100">
+				<label class="flex items-center gap-2 rounded border border-slate-800 px-2 py-1 text-sm hover:bg-slate-800">
 					<input type="checkbox" name="prereq_ids" value={n.id} checked={data.prereqIds.includes(n.id)} />
 					<span class="truncate">{n.title}</span>
-					<span class="ml-auto text-xs text-neutral-400">{n.slug}</span>
+					<span class="ml-auto text-xs text-slate-500">{n.slug}</span>
 				</label>
 			{:else}
-				<p class="text-sm text-neutral-500">No matching courses.</p>
+				<p class="text-sm text-slate-400">No matching courses.</p>
 			{/each}
 		</div>
 		<div class="flex justify-end">

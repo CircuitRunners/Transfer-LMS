@@ -26,8 +26,8 @@
 
 	const bgClass = $derived.by(() => {
 		const palette = [
-			'bg-neutral-900',
-			'bg-neutral-700',
+			'bg-slate-900',
+			'bg-slate-700',
 			'bg-amber-600',
 			'bg-sky-700',
 			'bg-emerald-700',

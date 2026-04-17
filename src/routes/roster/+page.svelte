@@ -25,17 +25,17 @@
 
 <section class="space-y-4">
 	<h1 class="text-2xl font-semibold">Roster Dashboard</h1>
-	<div class="rounded-xl border border-neutral-200 bg-white p-4">
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<h2 class="font-semibold">Bottlenecks</h2>
-		<ul class="mt-2 list-disc pl-5 text-sm text-neutral-700">
+		<ul class="mt-2 list-disc pl-5 text-sm text-slate-300">
 			{#each data.bottlenecks as b}
 				<li>{b.node}: {b.count} waiting</li>
 			{/each}
 		</ul>
 	</div>
-	<div class="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+	<div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
 		<table class="min-w-full text-sm">
-			<thead class="bg-neutral-100 text-left">
+			<thead class="bg-slate-800 text-left">
 				<tr>
 					<th class="p-2">Name</th>
 					<th class="p-2">Role</th>
@@ -45,11 +45,11 @@
 			</thead>
 			<tbody>
 				{#each data.rows as row}
-					<tr class="border-t border-neutral-200">
+					<tr class="border-t border-slate-800">
 						<td class="p-2">
 							<div class="flex items-center gap-2">
 								<button
-									class="rounded border border-neutral-200 px-2 py-0.5 text-xs"
+									class="rounded border border-slate-800 px-2 py-0.5 text-xs"
 									onclick={() => (expandedUserId = expandedUserId === row.id ? null : row.id)}
 								>
 									{expandedUserId === row.id ? 'Hide' : 'View'}
@@ -62,23 +62,23 @@
 						<td class="p-2">{row.pendingCheckoffs}</td>
 					</tr>
 					{#if expandedUserId === row.id}
-						<tr class="border-t border-neutral-200 bg-white/40">
+						<tr class="border-t border-slate-800 bg-slate-900/40">
 							<td colspan="4" class="p-3">
-								<div class="rounded border border-neutral-200 bg-white p-3">
+								<div class="rounded border border-slate-800 bg-slate-900 p-3">
 									<h3 class="mb-2 font-semibold">Courses Passed / In Progress</h3>
-									<ul class="space-y-2 text-xs text-neutral-700">
+									<ul class="space-y-2 text-xs text-slate-300">
 										{#each row.courses as c}
 											{@const courseKey = `${row.id}:${c.node_id}`}
-											<li class="rounded border border-neutral-200 p-2">
+											<li class="rounded border border-slate-800 p-2">
 												<div class="flex items-center justify-between gap-2">
 													<div>
 														<p class="font-medium">{c.title}</p>
-														<p class="text-neutral-500">{c.slug}</p>
+														<p class="text-slate-400">{c.slug}</p>
 													</div>
 													<div class="flex items-center gap-2">
-														<span class="rounded bg-neutral-100 px-2 py-0.5">{labelFor(c.status)}</span>
+														<span class="rounded bg-slate-800 px-2 py-0.5">{labelFor(c.status)}</span>
 														<button
-															class="rounded border border-neutral-200 px-2 py-0.5"
+															class="rounded border border-slate-800 px-2 py-0.5"
 															onclick={() =>
 																(expandedCourseKey = expandedCourseKey === courseKey ? null : courseKey)}
 														>
@@ -88,9 +88,9 @@
 												</div>
 												{#if expandedCourseKey === courseKey}
 													<div class="mt-2 grid gap-2 md:grid-cols-2">
-														<div class="rounded border border-neutral-200 bg-white/60 p-2">
+														<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
 															<p class="font-semibold">Checkoff Submission</p>
-															<p class="mt-1 whitespace-pre-wrap text-neutral-700">
+															<p class="mt-1 whitespace-pre-wrap text-slate-300">
 																{c.submission?.notes || 'No notes submitted.'}
 															</p>
 															{#if photosFor(c.submission).length}
@@ -103,24 +103,24 @@
 																</div>
 															{/if}
 														</div>
-														<div class="rounded border border-neutral-200 bg-white/60 p-2">
+														<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
 															<p class="font-semibold">Quiz Answers</p>
 															<ul class="mt-1 space-y-2">
 																{#each c.quizAttempts as a}
-																	<li class="rounded border border-neutral-200 p-2">
-																		<p class="text-neutral-500">
+																	<li class="rounded border border-slate-800 p-2">
+																		<p class="text-slate-400">
 																			{new Date(a.created_at).toLocaleString()} · {a.score}% · {a.passed
 																				? 'passed'
 																				: 'failed'}
 																		</p>
 																		<ul class="mt-1 space-y-1">
 																			{#each a.formattedAnswers as ans}
-																				<li class="rounded bg-white p-2">
-																					<p class="text-neutral-500">{ans.label}</p>
-																					<p class="text-neutral-800">{formatAnswer(ans.answerText)}</p>
+																				<li class="rounded bg-slate-900 p-2">
+																					<p class="text-slate-400">{ans.label}</p>
+																					<p class="text-slate-200">{formatAnswer(ans.answerText)}</p>
 																				</li>
 																			{:else}
-																				<li class="rounded bg-white p-2 text-neutral-500">No answers saved for this attempt.</li>
+																				<li class="rounded bg-slate-900 p-2 text-slate-400">No answers saved for this attempt.</li>
 																			{/each}
 																		</ul>
 																	</li>

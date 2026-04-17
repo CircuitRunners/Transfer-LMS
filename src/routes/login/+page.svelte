@@ -2,11 +2,11 @@
 	let { data } = $props();
 </script>
 
-<section class="mx-auto max-w-md space-y-4 rounded-xl border border-neutral-200 bg-white p-6">
+<section class="mx-auto max-w-md space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-6">
 	<h1 class="text-2xl font-semibold">Sign in</h1>
-	<p class="text-sm text-neutral-700">Use your team Google Workspace account to continue.</p>
+	<p class="text-sm text-slate-300">Use your team Google Workspace account to continue.</p>
 	{#if data?.error}
-		<p class="rounded bg-red-50 p-2 text-sm text-red-800">{data.error}</p>
+		<p class="rounded bg-red-900/30 p-2 text-sm text-red-200">{data.error}</p>
 	{/if}
 	<form method="POST" action="/auth/google">
 		<button

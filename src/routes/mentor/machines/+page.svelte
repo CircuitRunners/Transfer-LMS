@@ -36,30 +36,30 @@
 
 <section class="space-y-4">
 	<h1 class="text-2xl font-semibold">Machine Shop Admin</h1>
-	<p class="text-sm text-neutral-700">
+	<p class="text-sm text-slate-300">
 		Create machine entries with required completed training and print QR codes for shop access.
 	</p>
-	{#if error}<p class="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>{/if}
-	{#if success}<p class="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">{success}</p>{/if}
+	{#if error}<p class="rounded border border-red-700 bg-red-900/30 p-2 text-sm text-red-200">{error}</p>{/if}
+	{#if success}<p class="rounded border border-emerald-700 bg-emerald-900/30 p-2 text-sm text-emerald-200">{success}</p>{/if}
 
-	<div class="rounded-xl border border-neutral-200 bg-white p-4">
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<h2 class="mb-2 font-semibold">Create machine</h2>
 		<div class="grid gap-3 md:grid-cols-2">
 			<label class="flex flex-col gap-1 text-sm">
 				<span>Name</span>
-				<input class="rounded bg-neutral-100 px-2 py-2" bind:value={name} placeholder="Bandsaw A" />
+				<input class="rounded bg-slate-800 px-2 py-2" bind:value={name} placeholder="Bandsaw A" />
 			</label>
 			<label class="flex flex-col gap-1 text-sm">
 				<span>Location</span>
-				<input class="rounded bg-neutral-100 px-2 py-2" bind:value={location} placeholder="North wall bay" />
+				<input class="rounded bg-slate-800 px-2 py-2" bind:value={location} placeholder="North wall bay" />
 			</label>
 			<label class="flex flex-col gap-1 text-sm md:col-span-2">
 				<span>Description</span>
-				<textarea class="rounded bg-neutral-100 px-2 py-2" rows="3" bind:value={description}></textarea>
+				<textarea class="rounded bg-slate-800 px-2 py-2" rows="3" bind:value={description}></textarea>
 			</label>
 			<div class="md:col-span-2">
-				<p class="mb-1 text-sm text-neutral-700">Required completed training</p>
-				<div class="grid max-h-44 gap-1 overflow-y-auto rounded border border-neutral-200 bg-white/40 p-2 md:grid-cols-2">
+				<p class="mb-1 text-sm text-slate-300">Required completed training</p>
+				<div class="grid max-h-44 gap-1 overflow-y-auto rounded border border-slate-800 bg-slate-900/40 p-2 md:grid-cols-2">
 					{#each data.courses as c}
 						<label class="flex items-center gap-2 text-sm">
 							<input
@@ -82,44 +82,44 @@
 
 	<div class="grid gap-3 md:grid-cols-2">
 		{#each data.machines as m}
-			<div class="rounded-xl border border-neutral-200 bg-white p-4">
+			<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 				<div class="flex items-start justify-between gap-2">
 					<div>
 						<h3 class="font-semibold">{m.name}</h3>
-						<p class="text-xs text-neutral-500">{m.location || 'No location set'}</p>
+						<p class="text-xs text-slate-400">{m.location || 'No location set'}</p>
 					</div>
 					{#if m.qrDataUrl}
 						<a href={m.qrDataUrl} download={`${m.name}-qr.png`} class="text-xs text-yellow-300 underline">Download QR</a>
 					{/if}
 				</div>
-				<p class="mt-2 text-sm text-neutral-700">{m.description || 'No description.'}</p>
-				<p class="mt-2 text-xs text-neutral-500">
+				<p class="mt-2 text-sm text-slate-300">{m.description || 'No description.'}</p>
+				<p class="mt-2 text-xs text-slate-400">
 					Required: {Array.isArray(m.required_node_ids) && m.required_node_ids.length > 0
 						? m.required_node_ids.map((id: string) => trainingName(id)).join(', ')
 						: 'None'}
 				</p>
 				{#if m.qrDataUrl}
-					<img src={m.qrDataUrl} alt={`${m.name} QR`} class="mt-3 w-40 rounded bg-white p-2" />
+					<img src={m.qrDataUrl} alt={`${m.name} QR`} class="mt-3 w-40 rounded bg-slate-900 p-2" />
 				{/if}
 			</div>
 		{:else}
-			<p class="text-neutral-500">No machines created yet.</p>
+			<p class="text-slate-400">No machines created yet.</p>
 		{/each}
 	</div>
 
-	<div class="rounded-xl border border-neutral-200 bg-white p-4">
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<h2 class="mb-2 font-semibold">Recent machine use scans</h2>
 		<ul class="space-y-2 text-sm">
 			{#each data.usageEvents as evt}
-				<li class="rounded border border-neutral-200 bg-white/40 p-2">
-					<span class={evt.authorized ? 'text-emerald-700' : 'text-red-700'}>
+				<li class="rounded border border-slate-800 bg-slate-900/40 p-2">
+					<span class={evt.authorized ? 'text-emerald-300' : 'text-red-300'}>
 						{evt.authorized ? 'Authorized' : 'Denied'}
 					</span>
 					· {evt.user?.full_name || evt.user?.email || evt.user_id} · {evt.machine?.name || evt.machine_id}
 					· {new Date(evt.created_at).toLocaleString()}
 				</li>
 			{:else}
-				<li class="text-neutral-500">No usage events yet.</li>
+				<li class="text-slate-400">No usage events yet.</li>
 			{/each}
 		</ul>
 	</div>

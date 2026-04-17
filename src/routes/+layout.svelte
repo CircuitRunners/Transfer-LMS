@@ -50,19 +50,19 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<div class="flex min-h-screen bg-white text-neutral-900">
+<div class="flex min-h-screen bg-slate-950 text-slate-100">
 	<!-- Sidebar -->
 	<aside
-		class={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-neutral-200 bg-white transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+		class={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-700 bg-slate-900 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
 	>
-		<div class="flex items-center justify-between border-b border-neutral-200 px-5 py-5">
+		<div class="flex items-center justify-between border-b border-slate-700 px-5 py-5">
 			<a href="/dashboard" class="block leading-tight">
-				<p class="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-400">Transfer</p>
-				<p class="mt-0.5 text-sm font-semibold text-neutral-900">{data.orgName}</p>
+				<p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Transfer</p>
+				<p class="mt-0.5 text-sm font-semibold text-slate-100">{data.orgName}</p>
 			</a>
 			<button
 				type="button"
-				class="rounded p-1 text-neutral-500 hover:bg-neutral-100 md:hidden"
+				class="rounded p-1 text-slate-400 hover:bg-slate-800 md:hidden"
 				aria-label="Close navigation"
 				onclick={() => (mobileOpen = false)}
 			>
@@ -77,7 +77,7 @@
 		</div>
 
 		<nav class="flex-1 overflow-y-auto px-3 py-4 text-sm">
-			<p class="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+			<p class="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
 				Workspace
 			</p>
 			<ul class="space-y-0.5">
@@ -86,7 +86,7 @@
 						<a
 							href={item.href}
 							onclick={() => (mobileOpen = false)}
-							class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+							class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800'}`}
 						>
 							{item.label}
 						</a>
@@ -95,7 +95,7 @@
 			</ul>
 
 			{#if canMentor}
-				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
 					Mentor
 				</p>
 				<ul class="space-y-0.5">
@@ -104,7 +104,7 @@
 							<a
 								href={item.href}
 								onclick={() => (mobileOpen = false)}
-								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800'}`}
 							>
 								{item.label}
 							</a>
@@ -114,7 +114,7 @@
 			{/if}
 
 			{#if canAdmin}
-				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+				<p class="mt-6 px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
 					Admin
 				</p>
 				<ul class="space-y-0.5">
@@ -123,7 +123,7 @@
 							<a
 								href={item.href}
 								onclick={() => (mobileOpen = false)}
-								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
+								class={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${isActive(item, page.url.pathname) ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800'}`}
 							>
 								{item.label}
 							</a>
@@ -134,10 +134,10 @@
 		</nav>
 
 		{#if data.session && data.profile}
-			<div class="border-t border-neutral-200 p-3">
+			<div class="border-t border-slate-700 p-3">
 				<a
 					href="/profile"
-					class="flex items-center gap-3 rounded-md p-2 hover:bg-neutral-100"
+					class="flex items-center gap-3 rounded-md p-2 hover:bg-slate-800"
 				>
 					<Avatar
 						name={data.profile.full_name}
@@ -146,10 +146,10 @@
 						size="md"
 					/>
 					<div class="min-w-0 flex-1 leading-tight">
-						<p class="truncate text-sm font-medium text-neutral-900">
+						<p class="truncate text-sm font-medium text-slate-100">
 							{data.profile.full_name || data.profile.email}
 						</p>
-						<p class="truncate text-[11px] uppercase tracking-wider text-neutral-400">
+						<p class="truncate text-[11px] uppercase tracking-wider text-slate-500">
 							{data.profile.role.replace('_', ' ')}
 						</p>
 					</div>
@@ -157,7 +157,7 @@
 				<form method="POST" action="/auth/signout" class="mt-2">
 					<button
 						type="submit"
-						class="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+						class="w-full rounded-md border border-slate-600 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800"
 					>
 						Sign out
 					</button>
@@ -178,11 +178,11 @@
 	<div class="flex min-w-0 flex-1 flex-col">
 		<!-- Mobile top bar -->
 		<header
-			class="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 md:hidden"
+			class="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-3 md:hidden"
 		>
 			<button
 				type="button"
-				class="rounded p-1 text-neutral-700 hover:bg-neutral-100"
+				class="rounded p-1 text-slate-300 hover:bg-slate-800"
 				aria-label="Open navigation"
 				onclick={() => (mobileOpen = true)}
 			>
@@ -209,7 +209,7 @@
 			{/if}
 		</header>
 
-		<main class="flex-1 px-6 py-8 md:px-10 md:py-10">
+		<main class="flex-1 bg-slate-950 px-6 py-8 md:px-10 md:py-10">
 			<div class="mx-auto w-full max-w-6xl">
 				{@render children()}
 			</div>
