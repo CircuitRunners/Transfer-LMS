@@ -9,7 +9,32 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	const { nodeId, userId, action, notes, checklist_results, qrToken } = await request.json();
+	const { nodeId, userId, blockId, action, notes, checklist_results, qrToken } = await request.json();
+	const upsertReview = async (status: 'approved' | 'needs_review' | 'blocked') => {
+		const payload = {
+			user_id: userId,
+			node_id: nodeId,
+			block_id: blockId ?? null,
+			reviewer_id: user.id,
+			status,
+			mentor_notes: String(notes ?? ''),
+			checklist_results: Array.isArray(checklist_results) ? checklist_results : []
+		};
+		const updateQuery = locals.supabase
+			.from('checkoff_reviews')
+			.update(payload)
+			.eq('user_id', userId)
+			.eq('node_id', nodeId);
+		const { data: updatedRows, error: updateErr } = blockId
+			? await updateQuery.eq('block_id', blockId).select('id').limit(1)
+			: await updateQuery.is('block_id', null).select('id').limit(1);
+		if (updateErr) return updateErr;
+		if (!updatedRows || updatedRows.length === 0) {
+			const { error: insertErr } = await locals.supabase.from('checkoff_reviews').insert(payload);
+			if (insertErr) return insertErr;
+		}
+		return null;
+	};
 	const normalizedAction = action === 'review' ? 'reset_quiz' : action;
 	if (
 		!nodeId ||
@@ -20,18 +45,18 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	if (normalizedAction === 'approve') {
+		const submissionQuery = locals.supabase
+			.from('checkoff_submissions')
+			.select('photo_data_url,photo_data_urls')
+			.eq('node_id', nodeId)
+			.eq('user_id', userId);
 		const [{ data: requirement }, { data: submission }] = await Promise.all([
 			locals.supabase
 				.from('node_checkoff_requirements')
-				.select('evidence_mode')
+				.select('evidence_mode,mentor_checklist')
 				.eq('node_id', nodeId)
 				.maybeSingle(),
-			locals.supabase
-				.from('checkoff_submissions')
-				.select('photo_data_url,photo_data_urls')
-				.eq('node_id', nodeId)
-				.eq('user_id', userId)
-				.maybeSingle()
+			(blockId ? submissionQuery.eq('block_id', blockId) : submissionQuery.is('block_id', null)).maybeSingle()
 		]);
 		const hasPhoto = Boolean(
 			submission?.photo_data_url ||
@@ -111,10 +136,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		const { data: checkoffBlock } = await locals.supabase
 			.from('node_blocks')
 			.select('id')
+			.eq('id', blockId ?? '')
 			.eq('node_id', nodeId)
 			.eq('type', 'checkoff')
-			.order('position')
-			.limit(1)
 			.maybeSingle();
 
 		if (checkoffBlock?.id) {
@@ -130,17 +154,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			if (progressErr) return json({ error: progressErr.message }, { status: 400 });
 		}
 
-		const { error: reviewErr } = await locals.supabase.from('checkoff_reviews').upsert(
-			{
-				user_id: userId,
-				node_id: nodeId,
-				reviewer_id: user.id,
-				status: 'approved',
-				mentor_notes: String(notes ?? ''),
-				checklist_results: Array.isArray(checklist_results) ? checklist_results : []
-			},
-			{ onConflict: 'user_id,node_id' }
-		);
+		const reviewErr = await upsertReview('approved');
 		if (reviewErr) return json({ error: reviewErr.message }, { status: 400 });
 
 		if (checkoffBlock?.id) {
@@ -149,6 +163,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				p_target_user_id: userId
 			});
 			if (autoErr) return json({ error: autoErr.message }, { status: 400 });
+			await locals.supabase.rpc('transition_certification', {
+				p_node_id: nodeId,
+				p_new_status: 'quiz_pending',
+				p_target_user_id: userId
+			});
 		} else {
 			const { error } = await locals.supabase.rpc('transition_certification', {
 				p_node_id: nodeId,
@@ -162,36 +181,15 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	if (normalizedAction === 'retry_checkoff') {
-		await locals.supabase.from('checkoff_reviews').upsert(
-			{
-				user_id: userId,
-				node_id: nodeId,
-				reviewer_id: user.id,
-				status: 'needs_review',
-				mentor_notes: String(notes ?? ''),
-				checklist_results: Array.isArray(checklist_results) ? checklist_results : []
-			},
-			{ onConflict: 'user_id,node_id' }
-		);
+		const reviewErr = await upsertReview('needs_review');
+		if (reviewErr) return json({ error: reviewErr.message }, { status: 400 });
 		return json({ ok: true, status: 'needs_review' });
 	}
 
-	await locals.supabase.from('checkoff_reviews').upsert(
-		{
-			user_id: userId,
-			node_id: nodeId,
-			reviewer_id: user.id,
-			status:
-				normalizedAction === 'approve'
-					? 'approved'
-					: normalizedAction === 'block_checkoff'
-						? 'blocked'
-						: 'needs_review',
-			mentor_notes: String(notes ?? ''),
-			checklist_results: Array.isArray(checklist_results) ? checklist_results : []
-		},
-		{ onConflict: 'user_id,node_id' }
+	const reviewErr = await upsertReview(
+		normalizedAction === 'block_checkoff' ? 'blocked' : 'needs_review'
 	);
+	if (reviewErr) return json({ error: reviewErr.message }, { status: 400 });
 
 	return json({ ok: true });
 };

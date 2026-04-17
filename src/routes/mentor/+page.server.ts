@@ -43,13 +43,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		locals.supabase
 			.from('checkoff_reviews')
 			.select('user_id,node_id,status,mentor_notes,updated_at,reviewer_id')
+			.in('status', ['needs_review', 'blocked'])
 			.order('updated_at', { ascending: false })
 			.limit(120)
 	]);
 
 	const nodeIds = Array.from(new Set(baseQueue.map((item: any) => item.node_id)));
 	const userIds = Array.from(new Set(baseQueue.map((item: any) => item.user_id)));
-	const [reqResp, submissionResp, reviewsResp, nodesResp, profilesResp] = await Promise.all([
+	const [reqResp, submissionResp, reviewsResp, nodesResp, profilesResp, checkoffBlocksResp] = await Promise.all([
 		nodeIds.length
 			? locals.supabase
 					.from('node_checkoff_requirements')
@@ -59,14 +60,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		nodeIds.length && userIds.length
 			? locals.supabase
 					.from('checkoff_submissions')
-					.select('user_id,node_id,notes,photo_data_url,photo_data_urls,updated_at')
+					.select('user_id,node_id,block_id,notes,photo_data_url,photo_data_urls,updated_at')
 					.in('node_id', nodeIds)
 					.in('user_id', userIds)
 			: Promise.resolve({ data: [] as any[] }),
 		nodeIds.length && userIds.length
 			? locals.supabase
 					.from('checkoff_reviews')
-					.select('user_id,node_id,status,mentor_notes,checklist_results,reviewer_id,updated_at')
+					.select('user_id,node_id,block_id,status,mentor_notes,checklist_results,reviewer_id,updated_at')
 					.in('node_id', nodeIds)
 					.in('user_id', userIds)
 			: Promise.resolve({ data: [] as any[] }),
@@ -75,15 +76,35 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			: Promise.resolve({ data: [] as any[] }),
 		userIds.length
 			? locals.supabase.from('profiles').select('id,email,full_name,subteam_id').in('id', userIds)
+			: Promise.resolve({ data: [] as any[] }),
+		nodeIds.length
+			? locals.supabase
+					.from('node_blocks')
+					.select('id,node_id,position,type,config')
+					.in('node_id', nodeIds)
+					.eq('type', 'checkoff')
 			: Promise.resolve({ data: [] as any[] })
 	]);
 
 	const subteamMap = new Map((subteams ?? []).map((s: any) => [s.id, s]));
 	const requirementByNode = new Map((reqResp.data ?? []).map((r: any) => [r.node_id, r]));
-	const submissionByPair = new Map(
-		(submissionResp.data ?? []).map((s: any) => [`${s.user_id}:${s.node_id}`, s])
-	);
-	const reviewByPair = new Map((reviewsResp.data ?? []).map((r: any) => [`${r.user_id}:${r.node_id}`, r]));
+	const submissionByPair = new Map<string, any>();
+	for (const row of submissionResp.data ?? []) {
+		const key = `${row.user_id}:${row.node_id}`;
+		const prev = submissionByPair.get(key);
+		if (!prev || new Date(row.updated_at).getTime() > new Date(prev.updated_at).getTime()) {
+			submissionByPair.set(key, row);
+		}
+	}
+	const reviewByPair = new Map<string, any>();
+	for (const row of reviewsResp.data ?? []) {
+		const key = `${row.user_id}:${row.node_id}`;
+		const prev = reviewByPair.get(key);
+		if (!prev || new Date(row.updated_at).getTime() > new Date(prev.updated_at).getTime()) {
+			reviewByPair.set(key, row);
+		}
+	}
+	const checkoffBlockById = new Map((checkoffBlocksResp.data ?? []).map((b: any) => [b.id, b]));
 	const nodeById = new Map((nodesResp.data ?? []).map((n: any) => [n.id, n]));
 	const profileById = new Map((profilesResp.data ?? []).map((p: any) => [p.id, p]));
 	const historyNodeIds = Array.from(
@@ -128,10 +149,32 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				subteam: n?.subteam_id ? subteamMap.get(n.subteam_id) ?? null : null
 			};
 		})(),
-		requirement: requirementByNode.get(item.node_id) ?? null,
 		submission: submissionByPair.get(`${item.user_id}:${item.node_id}`) ?? null,
 		review: reviewByPair.get(`${item.user_id}:${item.node_id}`) ?? null
 	}));
+	queue = queue.map((item: any) => {
+		const activeBlockId = item.submission?.block_id ?? item.review?.block_id ?? null;
+		const block = activeBlockId ? checkoffBlockById.get(activeBlockId) : null;
+		const blockConfig = block?.config ?? null;
+		const fallback = requirementByNode.get(item.node_id) ?? null;
+		return {
+			...item,
+			active_block_id: activeBlockId,
+			requirement: blockConfig
+				? {
+						title: String(blockConfig.title ?? 'Checkoff'),
+						directions: String(blockConfig.directions ?? ''),
+						mentor_checklist: Array.isArray(blockConfig.mentor_checklist)
+							? blockConfig.mentor_checklist
+							: [],
+						resource_links: Array.isArray(blockConfig.resource_links)
+							? blockConfig.resource_links
+							: [],
+						evidence_mode: String(blockConfig.evidence_mode ?? 'none')
+					}
+				: fallback
+		};
+	});
 	queue = queue.map((item: any) => {
 		const derivedCheckoffStatus = item.review?.status
 			? item.review.status

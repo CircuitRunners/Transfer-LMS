@@ -136,14 +136,23 @@ export const actions: Actions = {
 
 	saveBlocks: async ({ locals, params, request }) => {
 		const form = await request.formData();
+		const rawBlocksJson = String(form.get('blocks_json') ?? '[]');
 		let draftBlocks: BlockDraft[] = [];
 		try {
-			draftBlocks = JSON.parse(String(form.get('blocks_json') ?? '[]'));
+			draftBlocks = JSON.parse(rawBlocksJson);
 		} catch {
-			return fail(400, { error: 'Block payload is malformed.', section: 'blocks' });
+			return fail(400, {
+				error: 'Block payload is malformed.',
+				section: 'blocks',
+				blocks_json: rawBlocksJson
+			});
 		}
 		if (!Array.isArray(draftBlocks)) {
-			return fail(400, { error: 'Blocks must be an array.', section: 'blocks' });
+			return fail(400, {
+				error: 'Blocks must be an array.',
+				section: 'blocks',
+				blocks_json: rawBlocksJson
+			});
 		}
 
 		const { data: nodeRow } = await locals.supabase
@@ -151,69 +160,158 @@ export const actions: Actions = {
 			.select('id')
 			.eq('slug', params.slug)
 			.single();
-		if (!nodeRow) return fail(404, { error: 'Course not found', section: 'blocks' });
+		if (!nodeRow) {
+			return fail(404, { error: 'Course not found', section: 'blocks', blocks_json: rawBlocksJson });
+		}
 
-		const rows: Array<{ node_id: string; position: number; type: BlockType; config: object }> = [];
-		let checkoffCount = 0;
+		const rows: Array<{ id?: string; node_id: string; position: number; type: BlockType; config: object }> = [];
+		const blockErrors: Record<number, string> = {};
 		for (let i = 0; i < draftBlocks.length; i += 1) {
 			const block = draftBlocks[i];
 			const type = block.type as BlockType;
 			if (!['video', 'quiz', 'checkoff'].includes(type)) {
-				return fail(400, { error: `Unknown block type at position ${i + 1}.`, section: 'blocks' });
+				blockErrors[i] = `Unknown block type at position ${i + 1}.`;
+				continue;
 			}
 			let config: Record<string, unknown>;
 			if (type === 'video') {
 				const v = normalizeVideoConfig(block.config);
 				if (!v.video_url) {
-					return fail(400, {
-						error: `Video block #${i + 1} needs a YouTube URL.`,
-						section: 'blocks'
-					});
+					blockErrors[i] = `Video block #${i + 1} needs a YouTube URL.`;
+					continue;
 				}
 				if (v.end_seconds != null && v.end_seconds <= v.start_seconds) {
-					return fail(400, {
-						error: `Video block #${i + 1} has an invalid end time.`,
-						section: 'blocks'
-					});
+					blockErrors[i] = `Video block #${i + 1} has an invalid end time.`;
+					continue;
 				}
 				config = v;
 			} else if (type === 'quiz') {
 				const q = normalizeQuizConfig(block.config);
 				if (q.short_answer_max_chars < q.short_answer_min_chars) {
-					return fail(400, {
-						error: `Quiz block #${i + 1} has min > max for short answer length.`,
-						section: 'blocks'
-					});
+					blockErrors[i] = `Quiz block #${i + 1} has min > max for short answer length.`;
+					continue;
 				}
 				if (!Array.isArray(q.questions) || q.questions.length === 0) {
-					return fail(400, {
-						error: `Quiz block #${i + 1} needs at least one question.`,
-						section: 'blocks'
-					});
+					blockErrors[i] = `Quiz block #${i + 1} needs at least one question.`;
+					continue;
 				}
 				config = q;
 			} else {
-				checkoffCount += 1;
-				if (checkoffCount > 1) {
-					return fail(400, {
-						error:
-							'Only one checkoff block per course is supported right now. Remove the extra checkoff block.',
-						section: 'blocks'
-					});
-				}
 				config = normalizeCheckoffConfig(block.config);
 			}
-			rows.push({ node_id: nodeRow.id, position: i + 1, type, config });
+			rows.push({ id: block.id, node_id: nodeRow.id, position: i + 1, type, config });
 		}
 
-		const { error: delErr } = await locals.supabase
+		if (Object.keys(blockErrors).length > 0) {
+			return fail(400, {
+				error: 'Please fix the highlighted block errors.',
+				section: 'blocks',
+				block_errors: blockErrors,
+				blocks_json: rawBlocksJson
+			});
+		}
+
+		const { data: existingBlocks, error: existingErr } = await locals.supabase
 			.from('node_blocks')
-			.delete()
+			.select('id')
 			.eq('node_id', nodeRow.id);
-		if (delErr) return fail(400, { error: delErr.message, section: 'blocks' });
-		if (rows.length > 0) {
-			const { error: insErr } = await locals.supabase.from('node_blocks').insert(rows);
-			if (insErr) return fail(400, { error: insErr.message, section: 'blocks' });
+		if (existingErr) {
+			return fail(400, {
+				error: existingErr.message,
+				section: 'blocks',
+				blocks_json: rawBlocksJson
+			});
+		}
+		const existingIds = new Set((existingBlocks ?? []).map((b: any) => String(b.id)));
+
+		// Move current rows out of the way to prevent unique(node_id, position) collisions during reorder.
+		const { error: shiftErr } = await locals.supabase
+			.from('node_blocks')
+			.update({ position: 1000000 })
+			.eq('node_id', nodeRow.id);
+		if (shiftErr) {
+			return fail(400, {
+				error: shiftErr.message,
+				section: 'blocks',
+				blocks_json: rawBlocksJson
+			});
+		}
+
+		const keepIds: string[] = [];
+		for (const row of rows) {
+			const persistedId = row.id ? String(row.id) : '';
+			if (persistedId && existingIds.has(persistedId)) {
+				const { data: updated, error: updateErr } = await locals.supabase
+					.from('node_blocks')
+					.update({
+						position: row.position,
+						type: row.type,
+						config: row.config
+					})
+					.eq('id', persistedId)
+					.eq('node_id', nodeRow.id)
+					.select('id')
+					.single();
+				if (updateErr) {
+					return fail(400, {
+						error: updateErr.message,
+						section: 'blocks',
+						blocks_json: rawBlocksJson
+					});
+				}
+				if (updated?.id) keepIds.push(String(updated.id));
+			} else {
+				const { data: inserted, error: insertErr } = await locals.supabase
+					.from('node_blocks')
+					.insert({
+						node_id: row.node_id,
+						position: row.position,
+						type: row.type,
+						config: row.config
+					})
+					.select('id')
+					.single();
+				if (insertErr) {
+					return fail(400, {
+						error: insertErr.message,
+						section: 'blocks',
+						blocks_json: rawBlocksJson
+					});
+				}
+				if (inserted?.id) keepIds.push(String(inserted.id));
+			}
+		}
+
+		if (keepIds.length > 0) {
+			const deleteIds = (existingBlocks ?? [])
+				.map((b: any) => String(b.id))
+				.filter((id: string) => !keepIds.includes(id));
+			if (deleteIds.length > 0) {
+				const { error: deleteMissingErr } = await locals.supabase
+					.from('node_blocks')
+					.delete()
+					.eq('node_id', nodeRow.id)
+					.in('id', deleteIds);
+				if (deleteMissingErr) {
+					return fail(400, {
+						error: deleteMissingErr.message,
+						section: 'blocks',
+						blocks_json: rawBlocksJson
+					});
+				}
+			}
+		} else {
+			const { error: clearErr } = await locals.supabase
+				.from('node_blocks')
+				.delete()
+				.eq('node_id', nodeRow.id);
+			if (clearErr) {
+				return fail(400, {
+					error: clearErr.message,
+					section: 'blocks',
+					blocks_json: rawBlocksJson
+				});
+			}
 		}
 
 		const checkoffBlock = rows.find((r) => r.type === 'checkoff');

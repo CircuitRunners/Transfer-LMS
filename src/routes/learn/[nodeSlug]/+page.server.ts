@@ -1,9 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-	const { user } = await locals.safeGetSession();
+export const load: PageServerLoad = async ({ params, locals, url }) => {
+	const { user, profile } = await locals.safeGetSession();
 	if (!user) throw error(401, 'Unauthorized');
+	const previewRequested = url.searchParams.get('preview') === '1';
+	const previewBypass = previewRequested && !!profile && ['mentor', 'admin'].includes(profile.role);
 
 	const { data: node } = await locals.supabase
 		.from('nodes')
@@ -48,15 +50,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.maybeSingle(),
 		locals.supabase
 			.from('checkoff_submissions')
-			.select('notes,photo_data_url,photo_data_urls,updated_at')
+			.select('block_id,notes,photo_data_url,photo_data_urls,updated_at')
 			.eq('node_id', node.id)
 			.eq('user_id', user.id)
+			.order('updated_at', { ascending: false })
+			.limit(1)
 			.maybeSingle(),
 		locals.supabase
 			.from('checkoff_reviews')
-			.select('status,mentor_notes,checklist_results,updated_at')
+			.select('block_id,status,mentor_notes,checklist_results,updated_at')
 			.eq('node_id', node.id)
 			.eq('user_id', user.id)
+			.order('updated_at', { ascending: false })
+			.limit(1)
 			.maybeSingle(),
 		locals.supabase
 			.from('node_blocks')
@@ -77,11 +83,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.limit(50)
 	]);
 
+	const computedStatus = statusRow?.computed_status ?? cert?.status ?? 'locked';
+	const effectiveStatus = previewBypass && computedStatus === 'locked' ? 'available' : computedStatus;
+
 	return {
 		node,
 		questions: assessment?.questions ?? [],
 		passingScore: assessment?.passing_score ?? 80,
-		certStatus: statusRow?.computed_status ?? cert?.status ?? 'locked',
+		certStatus: effectiveStatus,
 		cert: cert ?? null,
 		checkoff: checkoff ?? {
 			title: 'Physical checkoff',
@@ -94,7 +103,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		review: review ?? null,
 		blocks: blocks ?? [],
 		blockProgress: blockProgress ?? [],
-		blockAttempts: blockAttempts ?? []
+		blockAttempts: blockAttempts ?? [],
+		previewBypass
 	};
 };
 
@@ -112,6 +122,8 @@ export const actions: Actions = {
 
 		const form = await request.formData();
 		const notes = String(form.get('notes') ?? '').trim();
+		const blockIdRaw = String(form.get('block_id') ?? '').trim();
+		const blockId = blockIdRaw || null;
 		let photoDataUrls: string[] = [];
 		try {
 			photoDataUrls = JSON.parse(String(form.get('photo_data_urls_json') ?? '[]'));
@@ -143,16 +155,28 @@ export const actions: Actions = {
 			return fail(400, { error: 'At least one photo is required for this checkoff.', section: 'checkoff' });
 		}
 
-		const { error: upsertError } = await locals.supabase.from('checkoff_submissions').upsert(
-			{
-				user_id: user.id,
-				node_id: node.id,
-				notes,
-				photo_data_url: photoDataUrls[0] ?? null,
-				photo_data_urls: photoDataUrls
-			},
-			{ onConflict: 'user_id,node_id' }
-		);
+		const payload = {
+			user_id: user.id,
+			node_id: node.id,
+			block_id: blockId,
+			notes,
+			photo_data_url: photoDataUrls[0] ?? null,
+			photo_data_urls: photoDataUrls
+		};
+		let upsertError: { message: string } | null = null;
+		const updateQuery = locals.supabase
+			.from('checkoff_submissions')
+			.update(payload)
+			.eq('user_id', user.id)
+			.eq('node_id', node.id);
+		const { data: updatedRows, error: updateErr } = blockId
+			? await updateQuery.eq('block_id', blockId).select('id').limit(1)
+			: await updateQuery.is('block_id', null).select('id').limit(1);
+		if (updateErr) upsertError = { message: updateErr.message };
+		else if (!updatedRows || updatedRows.length === 0) {
+			const { error: insertErr } = await locals.supabase.from('checkoff_submissions').insert(payload);
+			if (insertErr) upsertError = { message: insertErr.message };
+		}
 		if (upsertError) return fail(400, { error: upsertError.message, section: 'checkoff' });
 
 		await locals.supabase.rpc('transition_certification', {

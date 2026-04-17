@@ -304,6 +304,11 @@
 				{statusInfo.label}
 			</span>
 		</p>
+		{#if data.previewBypass}
+			<p class="mt-2 text-xs text-sky-300">
+				Preview mode: prerequisite locks are bypassed for mentor/admin preview.
+			</p>
+		{/if}
 	</div>
 
 	{#if locked}
@@ -451,6 +456,11 @@
 						}}
 						class="space-y-3 rounded border border-slate-800 bg-slate-950/60 p-3"
 					>
+						<input
+							type="hidden"
+							name="block_id"
+							value={activeBlock.legacy ? '' : activeBlock.id}
+						/>
 						{#if blockedByMentor}
 							<p class="rounded border border-red-700 bg-red-900/20 p-2 text-xs text-red-200">
 								This checkoff is blocked by a mentor. Resolve the feedback before further review.

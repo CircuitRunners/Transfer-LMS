@@ -40,10 +40,20 @@
 		| { id?: string; type: 'checkoff'; config: CheckoffConfig };
 
 	let { data, form } = $props();
+	const postedBlocks = $derived.by<Block[] | null>(() => {
+		if (form?.section !== 'blocks' || !form?.blocks_json) return null;
+		try {
+			const parsed = JSON.parse(String(form.blocks_json));
+			return Array.isArray(parsed) ? (parsed as Block[]) : null;
+		} catch {
+			return null;
+		}
+	});
 
 	const initialBlocks = $derived<Block[]>(
-		Array.isArray(data.blocks)
-			? (data.blocks as any[]).map((row) => {
+		postedBlocks ??
+			(Array.isArray(data.blocks)
+				? (data.blocks as any[]).map((row) => {
 					const cfg = row.config ?? {};
 					if (row.type === 'video') {
 						return {
@@ -93,7 +103,7 @@
 						}
 					} as Block;
 				})
-			: []
+				: [])
 	);
 
 	let blocks = $state<Block[]>([]);
@@ -104,7 +114,7 @@
 	});
 
 	const blocksJson = $derived(JSON.stringify(blocks));
-	const hasCheckoff = $derived(blocks.some((b) => b.type === 'checkoff'));
+	const blockErrors = $derived((form?.block_errors as Record<number, string> | undefined) ?? {});
 
 	let prereqFilter = $state('');
 	const filteredNodes = $derived.by(() => {
@@ -140,7 +150,6 @@
 	}
 
 	function addBlock(type: BlockType) {
-		if (type === 'checkoff' && hasCheckoff) return;
 		if (type === 'video') {
 			blocks.push({
 				type: 'video',
@@ -391,8 +400,7 @@
 				</button>
 				<button
 					type="button"
-					class="rounded border border-emerald-700/60 bg-emerald-950/40 px-3 py-1 text-sm hover:bg-emerald-900/40 disabled:opacity-50"
-					disabled={hasCheckoff}
+					class="rounded border border-emerald-700/60 bg-emerald-950/40 px-3 py-1 text-sm hover:bg-emerald-900/40"
 					onclick={() => addBlock('checkoff')}
 				>
 					+ Checkoff
@@ -403,7 +411,7 @@
 
 		<div class="space-y-2">
 			{#each blocks as block, i (block.id ?? i)}
-				<div class="rounded border p-3 {blockStyles(block.type)}">
+				<div class="rounded border p-3 {blockStyles(block.type)} {blockErrors[i] ? 'ring-1 ring-red-500' : ''}">
 					<div class="flex flex-wrap items-center gap-2">
 						<span class="inline-flex items-center rounded bg-slate-900/60 px-2 py-0.5 text-xs font-semibold">
 							{i + 1}. {blockLabel(block.type)}
@@ -443,6 +451,11 @@
 
 					{#if expandedIndex === i}
 						<div class="mt-3 space-y-3 rounded bg-slate-950/60 p-3">
+							{#if blockErrors[i]}
+								<p class="rounded border border-red-700 bg-red-900/30 p-2 text-xs text-red-200">
+									{blockErrors[i]}
+								</p>
+							{/if}
 							{#if block.type === 'video'}
 								<div class="grid gap-2 md:grid-cols-2">
 									<label class="flex flex-col gap-1 text-xs text-slate-400">

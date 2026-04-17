@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
 	let { nodes = [], statuses = [], prerequisites = [] } = $props();
+	const hasGraphData = $derived((nodes?.length ?? 0) > 0 && (prerequisites?.length ?? 0) > 0);
 
 	const flowNodes = $derived.by(() => {
 		const statusMap = new Map(
@@ -76,9 +77,18 @@
 	);
 </script>
 
-<div class="h-[480px] overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-	<SvelteFlow nodes={flowNodes} edges={flowEdges} fitView>
-		<Background />
-		<Controls />
-	</SvelteFlow>
-</div>
+{#if hasGraphData}
+	<div
+		class="h-[480px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950"
+		style="--xy-background-color:#020617;--xy-controls-button-background-color:#0f172a;--xy-controls-button-color:#cbd5e1;"
+	>
+		<SvelteFlow nodes={flowNodes} edges={flowEdges} fitView>
+			<Background />
+			<Controls />
+		</SvelteFlow>
+	</div>
+{:else}
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+		No prerequisite graph to show yet.
+	</div>
+{/if}

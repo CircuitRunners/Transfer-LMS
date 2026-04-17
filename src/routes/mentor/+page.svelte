@@ -64,6 +64,7 @@
 			body: JSON.stringify({
 				nodeId: item.node_id,
 				userId: item.user_id,
+				blockId: item.active_block_id ?? null,
 				action: 'approve',
 				notes,
 				checklist_results,
@@ -87,6 +88,7 @@
 			body: JSON.stringify({
 				nodeId: item.node_id,
 				userId: item.user_id,
+				blockId: item.active_block_id ?? null,
 				action: 'reset_quiz',
 				notes,
 				checklist_results,
@@ -110,6 +112,7 @@
 			body: JSON.stringify({
 				nodeId: item.node_id,
 				userId: item.user_id,
+				blockId: item.active_block_id ?? null,
 				action: 'retry_checkoff',
 				notes,
 				checklist_results,
@@ -149,6 +152,7 @@
 			body: JSON.stringify({
 				nodeId: item.node_id,
 				userId: item.user_id,
+				blockId: item.active_block_id ?? null,
 				action: 'block_checkoff',
 				notes,
 				checklist_results,

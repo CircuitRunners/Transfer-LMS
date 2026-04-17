@@ -69,7 +69,7 @@
 						<td class="px-3 py-2">{subteamName(node.subteam_id)}</td>
 						<td class="px-3 py-2 text-right">
 							<a
-								href={`/learn/${node.slug}`}
+								href={`/learn/${node.slug}?preview=1`}
 								class="mr-2 rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-700"
 								>Preview</a
 							>
