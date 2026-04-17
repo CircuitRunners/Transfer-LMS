@@ -209,7 +209,7 @@
 			{/if}
 		</header>
 
-		<main class="flex-1 bg-slate-950 px-6 py-8 md:px-10 md:py-10">
+		<main class="flex-1 overflow-y-auto bg-slate-950 px-6 py-8 md:px-10 md:py-10">
 			<div class="mx-auto w-full max-w-6xl">
 				{@render children()}
 			</div>
