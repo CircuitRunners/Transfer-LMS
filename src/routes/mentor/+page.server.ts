@@ -33,6 +33,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	const baseQueue = certRows ?? [];
+	const [{ data: historyCertRows }, { data: reviewHistoryRows }] = await Promise.all([
+		locals.supabase
+			.from('certifications')
+			.select('user_id,node_id,approved_at,approved_by,status')
+			.eq('status', 'completed')
+			.order('approved_at', { ascending: false })
+			.limit(120),
+		locals.supabase
+			.from('checkoff_reviews')
+			.select('user_id,node_id,status,mentor_notes,updated_at,reviewer_id')
+			.order('updated_at', { ascending: false })
+			.limit(120)
+	]);
 
 	const nodeIds = Array.from(new Set(baseQueue.map((item: any) => item.node_id)));
 	const userIds = Array.from(new Set(baseQueue.map((item: any) => item.user_id)));
@@ -73,6 +86,28 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const reviewByPair = new Map((reviewsResp.data ?? []).map((r: any) => [`${r.user_id}:${r.node_id}`, r]));
 	const nodeById = new Map((nodesResp.data ?? []).map((n: any) => [n.id, n]));
 	const profileById = new Map((profilesResp.data ?? []).map((p: any) => [p.id, p]));
+	const historyNodeIds = Array.from(
+		new Set([
+			...(historyCertRows ?? []).map((row: any) => row.node_id),
+			...(reviewHistoryRows ?? []).map((row: any) => row.node_id)
+		])
+	);
+	const historyUserIds = Array.from(
+		new Set([
+			...(historyCertRows ?? []).map((row: any) => row.user_id),
+			...(reviewHistoryRows ?? []).map((row: any) => row.user_id)
+		])
+	);
+	const [historyNodesResp, historyProfilesResp] = await Promise.all([
+		historyNodeIds.length
+			? locals.supabase.from('nodes').select('id,title,slug,subteam_id').in('id', historyNodeIds)
+			: Promise.resolve({ data: [] as any[] }),
+		historyUserIds.length
+			? locals.supabase.from('profiles').select('id,full_name,email,subteam_id').in('id', historyUserIds)
+			: Promise.resolve({ data: [] as any[] })
+	]);
+	const historyNodeById = new Map((historyNodesResp.data ?? []).map((n: any) => [n.id, n]));
+	const historyProfileById = new Map((historyProfilesResp.data ?? []).map((p: any) => [p.id, p]));
 
 	let queue = baseQueue.map((item: any) => ({
 		id: item.id,
@@ -114,5 +149,33 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		queue = queue.filter((item: any) => item.node?.subteam_id === selectedTeamId);
 	}
 
-	return { queue, subteams: subteams ?? [], mentorTeamIds, scope, selectedTeamId, error: null };
+	const history: any[] = [
+		...(historyCertRows ?? []).map((row: any) => {
+			const n = historyNodeById.get(row.node_id);
+			const p = historyProfileById.get(row.user_id);
+			return {
+				kind: 'approved',
+				updated_at: row.approved_at,
+				mentor_notes: null,
+				user: p,
+				node: n
+			};
+		}),
+		...(reviewHistoryRows ?? []).map((row: any) => {
+			const n = historyNodeById.get(row.node_id);
+			const p = historyProfileById.get(row.user_id);
+			return {
+				kind: row.status,
+				updated_at: row.updated_at,
+				mentor_notes: row.mentor_notes,
+				user: p,
+				node: n
+			};
+		})
+	]
+		.filter((row: any) => row.user && row.node && row.updated_at)
+		.sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+		.slice(0, 120);
+
+	return { queue, history, subteams: subteams ?? [], mentorTeamIds, scope, selectedTeamId, error: null };
 };

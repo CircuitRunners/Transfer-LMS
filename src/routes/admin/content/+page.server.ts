@@ -5,7 +5,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const { data: nodes } = await locals.supabase
 		.from('nodes')
 		.select('id,title,slug,subteam_id')
-		.order('ordering');
+		.order('title');
 	return { subteams: subteams ?? [], nodes: nodes ?? [] };
 };
 
@@ -19,12 +19,11 @@ export const actions: Actions = {
 		const { data: node } = await locals.supabase
 			.from('nodes')
 			.insert({
-			title,
-			slug,
-			video_url: videoUrl,
-			subteam_id: subteamId,
-			description: String(form.get('description') ?? ''),
-			ordering: Number(form.get('ordering') ?? 0)
+				title,
+				slug,
+				video_url: videoUrl,
+				subteam_id: subteamId,
+				description: String(form.get('description') ?? '')
 			})
 			.select('id')
 			.single();

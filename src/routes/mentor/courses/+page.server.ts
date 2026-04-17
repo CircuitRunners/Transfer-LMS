@@ -11,8 +11,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	let query = locals.supabase
 		.from('nodes')
-		.select('id,title,slug,ordering,subteam_id')
-		.order('ordering', { ascending: true });
+		.select('id,title,slug,subteam_id')
+		.order('title', { ascending: true });
 
 	if (subteamFilter) query = query.eq('subteam_id', subteamFilter);
 	if (q) query = query.ilike('title', `%${q}%`);

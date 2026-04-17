@@ -25,24 +25,22 @@ export const actions: Actions = {
 		const subteamId = String(form.get('subteam_id') ?? '');
 		const videoUrl = String(form.get('video_url') ?? '').trim();
 		const description = String(form.get('description') ?? '');
-		const ordering = Number(form.get('ordering') ?? 0);
 
 		if (!title || !slug || !subteamId) {
 			return fail(400, {
 				error: 'Title, slug, and subteam are required.',
-				values: { title, slug, subteamId, videoUrl, description, ordering }
+				values: { title, slug, subteamId, videoUrl, description }
 			});
 		}
 
 		const { data: node, error } = await locals.supabase
 			.from('nodes')
 			.insert({
-			title,
-			slug,
-			subteam_id: subteamId,
-			video_url: videoUrl,
-			description,
-			ordering
+				title,
+				slug,
+				subteam_id: subteamId,
+				video_url: videoUrl,
+				description
 			})
 			.select('id')
 			.single();
@@ -50,7 +48,7 @@ export const actions: Actions = {
 		if (error) {
 			return fail(400, {
 				error: error.message,
-				values: { title, slug, subteamId, videoUrl, description, ordering }
+				values: { title, slug, subteamId, videoUrl, description }
 			});
 		}
 		if (node?.id) {

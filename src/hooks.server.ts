@@ -44,6 +44,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (path.startsWith('/mentor') && profile && !['mentor', 'admin'].includes(profile.role)) {
 		throw redirect(303, '/dashboard');
 	}
+	if (path.startsWith('/roster') && profile && !['mentor', 'admin'].includes(profile.role)) {
+		throw redirect(303, '/dashboard');
+	}
 	if (path.startsWith('/admin') && profile && profile.role !== 'admin') {
 		throw redirect(303, '/dashboard');
 	}

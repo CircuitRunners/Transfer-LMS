@@ -16,9 +16,6 @@
 		<div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
 			<a href="/" class="font-semibold">FRC Training LMS</a>
 			<nav class="flex items-center gap-4 text-sm">
-				<a href="/portals" class={page.url.pathname.startsWith('/portals') ? 'text-yellow-300' : ''}
-					>Portals</a
-				>
 				<a href="/dashboard" class={page.url.pathname === '/dashboard' ? 'text-yellow-300' : ''}
 					>Dashboard</a
 				>
@@ -38,8 +35,13 @@
 						class={page.url.pathname.startsWith('/mentor/courses') ? 'text-yellow-300' : ''}
 						>Courses</a
 					>
+					<a
+						href="/mentor/machines"
+						class={page.url.pathname.startsWith('/mentor/machines') ? 'text-yellow-300' : ''}
+						>Machine Shop</a
+					>
 				{/if}
-				{#if canAdmin}
+				{#if canMentor}
 					<a href="/roster" class={page.url.pathname === '/roster' ? 'text-yellow-300' : ''}
 						>Roster</a
 					>

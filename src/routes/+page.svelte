@@ -11,7 +11,7 @@
 				>Login with Google</a
 			>
 			<a class="rounded border border-slate-700 px-4 py-2" href="/dashboard">Open dashboard</a>
-			<a class="rounded border border-slate-700 px-4 py-2" href="/portals">Explore portals</a>
+			<a class="rounded border border-slate-700 px-4 py-2" href="/teams">Pick your team</a>
 		</div>
 	</div>
 	<div class="grid gap-3 md:grid-cols-3">

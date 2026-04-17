@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CheckoffCard from '$lib/components/CheckoffCard.svelte';
+	import QRScanner from '$lib/components/QRScanner.svelte';
 	import { createBrowserClient } from '@supabase/ssr';
 	import { env as publicEnv } from '$env/dynamic/public';
 	import { onMount } from 'svelte';
@@ -8,6 +9,10 @@
 	let actionError = $state('');
 	let selectedItem = $state<any | null>(null);
 	let selectedImage = $state<string | null>(null);
+	let scannedQrToken = $state('');
+	let scannedStudentId = $state('');
+	let scanMessage = $state('');
+	const getHistoryNotes = (entry: any) => entry?.mentor_notes ?? '';
 	const summary = $derived({
 		total: queue.length,
 		withEvidence: queue.filter((q) => (q.submission?.photo_data_urls?.length ?? 0) > 0 || q.submission?.photo_data_url).length,
@@ -36,6 +41,22 @@
 		};
 	});
 
+	const onDecodedForCheckoff = async (token: string) => {
+		const res = await fetch('/api/mentor/resolve-qr', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ token })
+		});
+		const body = await res.json().catch(() => null);
+		if (!res.ok) {
+			scanMessage = body?.error ?? 'Could not validate QR.';
+			return;
+		}
+		scannedQrToken = token;
+		scannedStudentId = body?.profile?.id ?? '';
+		scanMessage = scannedStudentId ? 'Passport verified for checkoff actions.' : 'Passport scan succeeded.';
+	};
+
 	const onApprove = async (item: any, notes = '', checklist_results: any[] = []) => {
 		const res = await fetch('/api/mentor/checkoff', {
 			method: 'POST',
@@ -45,7 +66,8 @@
 				userId: item.user_id,
 				action: 'approve',
 				notes,
-				checklist_results
+				checklist_results,
+				qrToken: scannedQrToken
 			})
 		});
 		if (!res.ok) {
@@ -67,7 +89,8 @@
 				userId: item.user_id,
 				action: 'reset_quiz',
 				notes,
-				checklist_results
+				checklist_results,
+				qrToken: scannedQrToken
 			})
 		});
 		if (!res.ok) {
@@ -89,7 +112,8 @@
 				userId: item.user_id,
 				action: 'retry_checkoff',
 				notes,
-				checklist_results
+				checklist_results,
+				qrToken: scannedQrToken
 			})
 		});
 		if (!res.ok) {
@@ -127,7 +151,8 @@
 				userId: item.user_id,
 				action: 'block_checkoff',
 				notes,
-				checklist_results
+				checklist_results,
+				qrToken: scannedQrToken
 			})
 		});
 		if (!res.ok) {
@@ -160,11 +185,18 @@
 <section class="space-y-4">
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<h1 class="text-2xl font-semibold">Pending Checkoffs</h1>
-		<a
-			href="/mentor/courses"
-			class="rounded bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600"
-			>Manage courses →</a
-		>
+		<div class="flex items-center gap-2">
+			<a
+				href="/mentor/machines"
+				class="rounded border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800"
+				>Machine shop</a
+			>
+			<a
+				href="/mentor/courses"
+				class="rounded bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600"
+				>Manage courses →</a
+			>
+		</div>
 	</div>
 	{#if data.error || actionError}
 		<div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-100">
@@ -228,6 +260,40 @@
 		</div>
 	{/if}
 
+	<div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+		<div class="mb-2 flex items-center justify-between">
+			<h2 class="text-lg font-semibold">Past Checkoffs</h2>
+			<span class="text-xs text-slate-400">Most recent first</span>
+		</div>
+		<ul class="space-y-2 text-sm">
+			{#each data.history as h}
+				<li class="rounded border border-slate-800 bg-slate-950/40 p-2">
+					<div class="flex items-center justify-between gap-2">
+						<p>
+							<span class="font-medium">{h.user?.full_name || h.user?.email}</span>
+							· {h.node?.title}
+						</p>
+						<span class="text-xs text-slate-400">{new Date(h.updated_at).toLocaleString()}</span>
+					</div>
+					<p class="mt-1 text-xs text-slate-400">
+						{h.kind === 'approved'
+							? 'Approved'
+							: h.kind === 'blocked'
+								? 'Blocked'
+								: h.kind === 'needs_review'
+									? 'Requested checkoff retry'
+									: 'Status update'}
+					</p>
+					{#if getHistoryNotes(h)}
+						<p class="mt-1 text-xs text-slate-300">{getHistoryNotes(h)}</p>
+					{/if}
+				</li>
+			{:else}
+				<li class="text-slate-400">No past checkoffs yet.</li>
+			{/each}
+		</ul>
+	</div>
+
 	{#if selectedItem}
 		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
 			<div class="max-h-[95vh] w-full max-w-4xl overflow-auto rounded-xl border border-slate-700 bg-slate-950 p-4">
@@ -236,6 +302,26 @@
 					<button class="rounded border border-slate-700 px-3 py-1 text-sm" onclick={() => (selectedItem = null)}
 						>Close</button
 					>
+				</div>
+				<div class="mb-3 rounded border border-slate-800 bg-slate-900 p-3">
+					<p class="mb-2 text-xs text-slate-400">Required: scan this student's passport before action</p>
+					<div class="grid gap-3 md:grid-cols-2">
+						<div class="rounded bg-slate-950/60 p-2">
+							<QRScanner onDecoded={onDecodedForCheckoff} />
+						</div>
+						<div class="text-sm text-slate-300">
+							<p>Selected student: {selectedItem.profile?.full_name || selectedItem.profile?.email}</p>
+							<p>
+								Scanned student id: {scannedStudentId || '—'}
+								{#if scannedStudentId === selectedItem.user_id}
+									<span class="ml-2 text-emerald-300">match</span>
+								{:else if scannedStudentId}
+									<span class="ml-2 text-red-300">mismatch</span>
+								{/if}
+							</p>
+							{#if scanMessage}<p class="mt-1 text-xs text-slate-400">{scanMessage}</p>{/if}
+						</div>
+					</div>
 				</div>
 				<CheckoffCard
 					item={selectedItem}

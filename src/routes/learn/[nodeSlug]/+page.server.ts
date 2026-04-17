@@ -19,9 +19,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		{ data: statusRow },
 		{ data: checkoff },
 		{ data: submission },
-		{ data: review }
-	] =
-		await Promise.all([
+		{ data: review },
+		{ data: blocks },
+		{ data: blockProgress },
+		{ data: blockAttempts }
+	] = await Promise.all([
 		locals.supabase
 			.from('assessments')
 			.select('questions,passing_score')
@@ -55,7 +57,24 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.select('status,mentor_notes,checklist_results,updated_at')
 			.eq('node_id', node.id)
 			.eq('user_id', user.id)
-			.maybeSingle()
+			.maybeSingle(),
+		locals.supabase
+			.from('node_blocks')
+			.select('id,position,type,config')
+			.eq('node_id', node.id)
+			.order('position'),
+		locals.supabase
+			.from('user_node_block_progress')
+			.select('block_id,completed_at,best_score')
+			.eq('node_id', node.id)
+			.eq('user_id', user.id),
+		locals.supabase
+			.from('block_quiz_attempts')
+			.select('block_id,score,passed,created_at')
+			.eq('node_id', node.id)
+			.eq('user_id', user.id)
+			.order('created_at', { ascending: false })
+			.limit(50)
 	]);
 
 	return {
@@ -72,7 +91,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			evidence_mode: 'none'
 		},
 		submission: submission ?? null,
-		review: review ?? null
+		review: review ?? null,
+		blocks: blocks ?? [],
+		blockProgress: blockProgress ?? [],
+		blockAttempts: blockAttempts ?? []
 	};
 };
 
@@ -132,6 +154,12 @@ export const actions: Actions = {
 			{ onConflict: 'user_id,node_id' }
 		);
 		if (upsertError) return fail(400, { error: upsertError.message, section: 'checkoff' });
+
+		await locals.supabase.rpc('transition_certification', {
+			p_node_id: node.id,
+			p_new_status: 'mentor_checkoff_pending',
+			p_target_user_id: user.id
+		});
 
 		return { ok: true, section: 'checkoff' };
 	}

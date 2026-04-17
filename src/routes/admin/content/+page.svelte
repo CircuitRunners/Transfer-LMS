@@ -22,7 +22,6 @@
 				<option value={team.id}>{team.name}</option>
 			{/each}
 		</select>
-		<input class="rounded bg-slate-800 px-2 py-2 md:col-span-2" name="ordering" type="number" min="0" value="0" />
 		<textarea
 			class="rounded bg-slate-800 px-2 py-2 md:col-span-2"
 			name="description"

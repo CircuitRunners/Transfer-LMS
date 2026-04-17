@@ -8,8 +8,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const [nodesResp, statusesResp, subteamsResp, prereqResp, reviewResp] = await Promise.all([
 		locals.supabase
 			.from('nodes')
-			.select('id,title,slug,ordering,subteam_id')
-			.order('ordering', { ascending: true }),
+			.select('id,title,slug,subteam_id')
+			.order('title', { ascending: true }),
 		locals.supabase
 			.from('v_user_node_status')
 			.select('node_id,computed_status')

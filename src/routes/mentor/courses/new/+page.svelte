@@ -1,6 +1,9 @@
 <script lang="ts">
 	let { data, form } = $props();
-	const v = (key: string, fallback: string | number = '') => form?.values?.[key] ?? fallback;
+	const v = (key: string, fallback: string | number = ''): string | number => {
+		const values = form?.values as unknown as Record<string, string | number> | undefined;
+		return values?.[key] ?? fallback;
+	};
 </script>
 
 <section class="space-y-4">
@@ -8,8 +11,8 @@
 		<a href="/mentor/courses" class="text-xs text-slate-400">← All courses</a>
 		<h1 class="text-2xl font-semibold">New course</h1>
 		<p class="text-sm text-slate-400">
-			Create a module with its video and ordering. You can configure quiz, prerequisites, and
-			checkoff requirements after saving.
+			Create the module shell. You'll add video, quiz, and checkoff blocks in the builder after
+			saving.
 		</p>
 	</div>
 
@@ -58,16 +61,6 @@
 				name="video_url"
 				value={v('videoUrl')}
 				placeholder="https://www.youtube.com/..."
-			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-slate-300">Order</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="ordering"
-				type="number"
-				min="0"
-				value={v('ordering', 0)}
 			/>
 		</label>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">

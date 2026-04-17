@@ -43,7 +43,7 @@
 		}
 		const perLayerOffset = new Map<number, number>();
 
-		return nodes.map((n: { id: string; title: string; ordering: number }) => {
+		return nodes.map((n: { id: string; title: string }) => {
 			const status = statusMap.get(n.id) ?? 'locked';
 			const color =
 				status === 'completed'

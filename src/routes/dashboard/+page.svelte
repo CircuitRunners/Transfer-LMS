@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SkillTree from '$lib/components/SkillTree.svelte';
 
-	type Node = { id: string; title: string; slug: string; ordering: number; subteam_id: string };
+	type Node = { id: string; title: string; slug: string; subteam_id: string };
 	type Status = { node_id: string; computed_status: string };
 	type Subteam = { id: string; name: string; slug: string };
 	type CheckoffReview = { node_id: string; status: 'needs_review' | 'blocked'; updated_at: string };
@@ -96,7 +96,7 @@
 			const ap = preferredTeam && a.subteam_id === preferredTeam ? 0 : 1;
 			const bp = preferredTeam && b.subteam_id === preferredTeam ? 0 : 1;
 			if (ap !== bp) return ap - bp;
-			return a.ordering - b.ordering;
+			return a.title.localeCompare(b.title);
 		});
 		return candidates[0] ?? null;
 	});
@@ -144,10 +144,8 @@
 					Welcome {data.profile?.full_name || data.profile?.email || 'teammate'}.
 				</p>
 			</div>
-			<a
-				href="/portals"
-				class="inline-flex rounded border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800"
-				>Open portal directory</a
+			<a href="/teams" class="inline-flex rounded border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800"
+				>Manage teams</a
 			>
 		</div>
 		<div class="mt-4 grid grid-cols-2 gap-2 text-center md:grid-cols-4">

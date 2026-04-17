@@ -8,63 +8,98 @@ const slugify = (value: string) =>
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 
+type BlockType = 'video' | 'quiz' | 'checkoff';
+type BlockDraft = {
+	id?: string;
+	type: BlockType;
+	config: Record<string, unknown>;
+};
+
+const clampInt = (value: unknown, fallback: number, min: number, max: number) => {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(max, Math.max(min, Math.trunc(n)));
+};
+
+function normalizeVideoConfig(raw: any) {
+	const title = String(raw?.title ?? '').trim();
+	const video_url = String(raw?.video_url ?? '').trim();
+	const start_seconds = Math.max(0, Math.trunc(Number(raw?.start_seconds ?? 0)) || 0);
+	const endRaw = Number(raw?.end_seconds);
+	const end_seconds = Number.isFinite(endRaw) && endRaw > 0 ? Math.trunc(endRaw) : null;
+	return { title, video_url, start_seconds, end_seconds };
+}
+
+function normalizeQuizConfig(raw: any) {
+	const title = String(raw?.title ?? '').trim();
+	const passing_score = clampInt(raw?.passing_score, 80, 1, 100);
+	const min_seconds_between_attempts = clampInt(raw?.min_seconds_between_attempts, 15, 0, 3600);
+	const fail_window_minutes = clampInt(raw?.fail_window_minutes, 10, 1, 1440);
+	const max_failed_in_window = clampInt(raw?.max_failed_in_window, 5, 1, 200);
+	const short_answer_min_chars = clampInt(raw?.short_answer_min_chars, 3, 0, 5000);
+	const short_answer_max_chars = clampInt(raw?.short_answer_max_chars, 300, 1, 5000);
+	const questions = Array.isArray(raw?.questions) ? raw.questions : [];
+	return {
+		title,
+		passing_score,
+		min_seconds_between_attempts,
+		fail_window_minutes,
+		max_failed_in_window,
+		short_answer_min_chars,
+		short_answer_max_chars,
+		questions
+	};
+}
+
+function normalizeCheckoffConfig(raw: any) {
+	const validEvidence = new Set(['none', 'photo_optional', 'photo_required']);
+	const title = String(raw?.title ?? '').trim() || 'Physical checkoff';
+	const directions = String(raw?.directions ?? '').trim();
+	const evidence_mode = validEvidence.has(String(raw?.evidence_mode))
+		? String(raw?.evidence_mode)
+		: 'none';
+	const mentor_checklist = Array.isArray(raw?.mentor_checklist)
+		? raw.mentor_checklist
+				.map((v: unknown) => String(v ?? '').trim())
+				.filter(Boolean)
+		: [];
+	const resource_links = Array.isArray(raw?.resource_links)
+		? raw.resource_links.map((v: unknown) => String(v ?? '').trim()).filter(Boolean)
+		: [];
+	return { title, directions, evidence_mode, mentor_checklist, resource_links };
+}
+
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const { data: node, error: nodeErr } = await locals.supabase
 		.from('nodes')
-		.select('id,title,slug,description,video_url,ordering,subteam_id')
+		.select('id,title,slug,description,video_url,subteam_id')
 		.eq('slug', params.slug)
 		.single();
-
 	if (nodeErr || !node) throw error(404, 'Course not found');
 
-	const [subteamsResp, assessmentResp, prereqsResp, allNodesResp, checkoffResp] = await Promise.all([
+	const [subteamsResp, prereqsResp, allNodesResp, blocksResp] = await Promise.all([
 		locals.supabase.from('subteams').select('id,name').order('name'),
-		locals.supabase
-			.from('assessments')
-			.select(
-				'passing_score,questions,min_seconds_between_attempts,fail_window_minutes,max_failed_in_window,short_answer_min_chars,short_answer_max_chars'
-			)
-			.eq('node_id', node.id)
-			.maybeSingle(),
-		locals.supabase
-			.from('node_prerequisites')
-			.select('prerequisite_node_id')
-			.eq('node_id', node.id),
+		locals.supabase.from('node_prerequisites').select('prerequisite_node_id').eq('node_id', node.id),
 		locals.supabase
 			.from('nodes')
-			.select('id,title,slug,ordering,subteam_id')
+			.select('id,title,slug,subteam_id')
 			.neq('id', node.id)
-			.order('ordering'),
+			.order('title'),
 		locals.supabase
-			.from('node_checkoff_requirements')
-			.select('title,directions,mentor_checklist,resource_links,evidence_mode')
+			.from('node_blocks')
+			.select('id,position,type,config')
 			.eq('node_id', node.id)
-			.maybeSingle()
+			.order('position')
 	]);
 
 	return {
 		node,
 		subteams: subteamsResp.data ?? [],
-		assessment: assessmentResp.data ?? {
-			passing_score: 80,
-			questions: [],
-			min_seconds_between_attempts: 15,
-			fail_window_minutes: 10,
-			max_failed_in_window: 5,
-			short_answer_min_chars: 3,
-			short_answer_max_chars: 300
-		},
 		prereqIds: (prereqsResp.data ?? []).map((p: { prerequisite_node_id: string }) =>
 			p.prerequisite_node_id
 		),
 		allNodes: allNodesResp.data ?? [],
-		checkoff: checkoffResp.data ?? {
-			title: 'Physical checkoff',
-			directions: '',
-			mentor_checklist: [],
-			resource_links: [],
-			evidence_mode: 'none'
-		}
+		blocks: blocksResp.data ?? []
 	};
 };
 
@@ -77,7 +112,6 @@ export const actions: Actions = {
 		const subteamId = String(form.get('subteam_id') ?? '');
 		const videoUrl = String(form.get('video_url') ?? '').trim();
 		const description = String(form.get('description') ?? '');
-		const ordering = Number(form.get('ordering') ?? 0);
 
 		if (!title || !slug || !subteamId) {
 			return fail(400, { error: 'Title, slug, and subteam are required.', section: 'details' });
@@ -90,8 +124,7 @@ export const actions: Actions = {
 				slug,
 				subteam_id: subteamId,
 				video_url: videoUrl,
-				description,
-				ordering
+				description
 			})
 			.eq('slug', params.slug);
 
@@ -101,69 +134,135 @@ export const actions: Actions = {
 		return { ok: true, section: 'details' };
 	},
 
-	saveAssessment: async ({ locals, params, request }) => {
+	saveBlocks: async ({ locals, params, request }) => {
 		const form = await request.formData();
-		const passingScore = Math.min(100, Math.max(1, Number(form.get('passing_score') ?? 80)));
-		const minSecondsBetweenAttempts = Math.min(
-			3600,
-			Math.max(0, Number(form.get('min_seconds_between_attempts') ?? 15))
-		);
-		const failWindowMinutes = Math.min(
-			1440,
-			Math.max(1, Number(form.get('fail_window_minutes') ?? 10))
-		);
-		const maxFailedInWindow = Math.min(
-			200,
-			Math.max(1, Number(form.get('max_failed_in_window') ?? 5))
-		);
-		const shortAnswerMinChars = Math.min(
-			5000,
-			Math.max(0, Number(form.get('short_answer_min_chars') ?? 3))
-		);
-		const shortAnswerMaxChars = Math.min(
-			5000,
-			Math.max(1, Number(form.get('short_answer_max_chars') ?? 300))
-		);
-		if (shortAnswerMaxChars < shortAnswerMinChars) {
-			return fail(400, {
-				error: 'Short answer max characters must be greater than or equal to min.',
-				section: 'assessment'
-			});
-		}
-		let questions: unknown;
+		let draftBlocks: BlockDraft[] = [];
 		try {
-			questions = JSON.parse(String(form.get('questions') ?? '[]'));
+			draftBlocks = JSON.parse(String(form.get('blocks_json') ?? '[]'));
 		} catch {
-			return fail(400, { error: 'Questions payload is malformed.', section: 'assessment' });
+			return fail(400, { error: 'Block payload is malformed.', section: 'blocks' });
 		}
-		if (!Array.isArray(questions)) {
-			return fail(400, { error: 'Questions must be an array.', section: 'assessment' });
+		if (!Array.isArray(draftBlocks)) {
+			return fail(400, { error: 'Blocks must be an array.', section: 'blocks' });
 		}
 
-		const { data: node } = await locals.supabase
+		const { data: nodeRow } = await locals.supabase
 			.from('nodes')
 			.select('id')
 			.eq('slug', params.slug)
 			.single();
-		if (!node) return fail(404, { error: 'Course not found', section: 'assessment' });
+		if (!nodeRow) return fail(404, { error: 'Course not found', section: 'blocks' });
 
-		const { error: err } = await locals.supabase
-			.from('assessments')
-			.upsert(
+		const rows: Array<{ node_id: string; position: number; type: BlockType; config: object }> = [];
+		let checkoffCount = 0;
+		for (let i = 0; i < draftBlocks.length; i += 1) {
+			const block = draftBlocks[i];
+			const type = block.type as BlockType;
+			if (!['video', 'quiz', 'checkoff'].includes(type)) {
+				return fail(400, { error: `Unknown block type at position ${i + 1}.`, section: 'blocks' });
+			}
+			let config: Record<string, unknown>;
+			if (type === 'video') {
+				const v = normalizeVideoConfig(block.config);
+				if (!v.video_url) {
+					return fail(400, {
+						error: `Video block #${i + 1} needs a YouTube URL.`,
+						section: 'blocks'
+					});
+				}
+				if (v.end_seconds != null && v.end_seconds <= v.start_seconds) {
+					return fail(400, {
+						error: `Video block #${i + 1} has an invalid end time.`,
+						section: 'blocks'
+					});
+				}
+				config = v;
+			} else if (type === 'quiz') {
+				const q = normalizeQuizConfig(block.config);
+				if (q.short_answer_max_chars < q.short_answer_min_chars) {
+					return fail(400, {
+						error: `Quiz block #${i + 1} has min > max for short answer length.`,
+						section: 'blocks'
+					});
+				}
+				if (!Array.isArray(q.questions) || q.questions.length === 0) {
+					return fail(400, {
+						error: `Quiz block #${i + 1} needs at least one question.`,
+						section: 'blocks'
+					});
+				}
+				config = q;
+			} else {
+				checkoffCount += 1;
+				if (checkoffCount > 1) {
+					return fail(400, {
+						error:
+							'Only one checkoff block per course is supported right now. Remove the extra checkoff block.',
+						section: 'blocks'
+					});
+				}
+				config = normalizeCheckoffConfig(block.config);
+			}
+			rows.push({ node_id: nodeRow.id, position: i + 1, type, config });
+		}
+
+		const { error: delErr } = await locals.supabase
+			.from('node_blocks')
+			.delete()
+			.eq('node_id', nodeRow.id);
+		if (delErr) return fail(400, { error: delErr.message, section: 'blocks' });
+		if (rows.length > 0) {
+			const { error: insErr } = await locals.supabase.from('node_blocks').insert(rows);
+			if (insErr) return fail(400, { error: insErr.message, section: 'blocks' });
+		}
+
+		const checkoffBlock = rows.find((r) => r.type === 'checkoff');
+		if (checkoffBlock) {
+			const cfg = checkoffBlock.config as ReturnType<typeof normalizeCheckoffConfig>;
+			await locals.supabase.from('node_checkoff_requirements').upsert(
 				{
-					node_id: node.id,
-					passing_score: passingScore,
-					questions,
-					min_seconds_between_attempts: minSecondsBetweenAttempts,
-					fail_window_minutes: failWindowMinutes,
-					max_failed_in_window: maxFailedInWindow,
-					short_answer_min_chars: shortAnswerMinChars,
-					short_answer_max_chars: shortAnswerMaxChars
+					node_id: nodeRow.id,
+					title: cfg.title,
+					directions: cfg.directions,
+					mentor_checklist: cfg.mentor_checklist,
+					resource_links: cfg.resource_links,
+					evidence_mode: cfg.evidence_mode
 				},
 				{ onConflict: 'node_id' }
 			);
-		if (err) return fail(400, { error: err.message, section: 'assessment' });
-		return { ok: true, section: 'assessment' };
+		} else {
+			await locals.supabase.from('node_checkoff_requirements').upsert(
+				{
+					node_id: nodeRow.id,
+					title: 'Physical checkoff',
+					directions: '',
+					mentor_checklist: [],
+					resource_links: [],
+					evidence_mode: 'none'
+				},
+				{ onConflict: 'node_id' }
+			);
+		}
+
+		const quizBlocks = rows.filter((r) => r.type === 'quiz');
+		const firstQuiz = quizBlocks[0]?.config as ReturnType<typeof normalizeQuizConfig> | undefined;
+		if (firstQuiz) {
+			await locals.supabase.from('assessments').upsert(
+				{
+					node_id: nodeRow.id,
+					passing_score: firstQuiz.passing_score,
+					questions: firstQuiz.questions,
+					min_seconds_between_attempts: firstQuiz.min_seconds_between_attempts,
+					fail_window_minutes: firstQuiz.fail_window_minutes,
+					max_failed_in_window: firstQuiz.max_failed_in_window,
+					short_answer_min_chars: firstQuiz.short_answer_min_chars,
+					short_answer_max_chars: firstQuiz.short_answer_max_chars
+				},
+				{ onConflict: 'node_id' }
+			);
+		}
+
+		return { ok: true, section: 'blocks' };
 	},
 
 	savePrereqs: async ({ locals, params, request }) => {
@@ -173,78 +272,31 @@ export const actions: Actions = {
 			.map((v) => String(v))
 			.filter(Boolean);
 
-		const { data: node } = await locals.supabase
+		const { data: nodeRow } = await locals.supabase
 			.from('nodes')
 			.select('id')
 			.eq('slug', params.slug)
 			.single();
-		if (!node) return fail(404, { error: 'Course not found', section: 'prereqs' });
+		if (!nodeRow) return fail(404, { error: 'Course not found', section: 'prereqs' });
 
 		const { error: delErr } = await locals.supabase
 			.from('node_prerequisites')
 			.delete()
-			.eq('node_id', node.id);
+			.eq('node_id', nodeRow.id);
 		if (delErr) return fail(400, { error: delErr.message, section: 'prereqs' });
 
 		if (ids.length) {
-			const rows = ids
-				.filter((id) => id !== node.id)
-				.map((id) => ({ node_id: node.id, prerequisite_node_id: id }));
-			if (rows.length) {
+			const insertRows = ids
+				.filter((id) => id !== nodeRow.id)
+				.map((id) => ({ node_id: nodeRow.id, prerequisite_node_id: id }));
+			if (insertRows.length) {
 				const { error: insErr } = await locals.supabase
 					.from('node_prerequisites')
-					.insert(rows);
+					.insert(insertRows);
 				if (insErr) return fail(400, { error: insErr.message, section: 'prereqs' });
 			}
 		}
 		return { ok: true, section: 'prereqs' };
-	},
-
-	saveCheckoff: async ({ locals, params, request }) => {
-		const form = await request.formData();
-		const title = String(form.get('checkoff_title') ?? 'Physical checkoff').trim();
-		const directions = String(form.get('checkoff_directions') ?? '').trim();
-		const evidenceMode = String(form.get('evidence_mode') ?? 'none');
-		const checklistInput = String(form.get('mentor_checklist_text') ?? '');
-		const linksInput = String(form.get('resource_links_text') ?? '');
-
-		const validEvidenceModes = new Set(['none', 'photo_optional', 'photo_required']);
-		if (!validEvidenceModes.has(evidenceMode)) {
-			return fail(400, { error: 'Invalid evidence mode.', section: 'checkoff' });
-		}
-
-		const mentorChecklist = checklistInput
-			.split('\n')
-			.map((line) => line.trim())
-			.filter(Boolean);
-		const resourceLinks = linksInput
-			.split('\n')
-			.map((line) => line.trim())
-			.filter(Boolean);
-
-		const { data: node } = await locals.supabase
-			.from('nodes')
-			.select('id')
-			.eq('slug', params.slug)
-			.single();
-		if (!node) return fail(404, { error: 'Course not found', section: 'checkoff' });
-
-		const { error: upsertError } = await locals.supabase
-			.from('node_checkoff_requirements')
-			.upsert(
-				{
-					node_id: node.id,
-					title: title || 'Physical checkoff',
-					directions,
-					mentor_checklist: mentorChecklist,
-					resource_links: resourceLinks,
-					evidence_mode: evidenceMode
-				},
-				{ onConflict: 'node_id' }
-			);
-		if (upsertError) return fail(400, { error: upsertError.message, section: 'checkoff' });
-
-		return { ok: true, section: 'checkoff' };
 	},
 
 	deleteNode: async ({ locals, params }) => {

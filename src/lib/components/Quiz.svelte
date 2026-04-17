@@ -12,12 +12,16 @@
 	let {
 		questions,
 		nodeId,
+		segmentId = null,
+		blockId = null,
 		passingScore = 80,
 		allowSubmit = true,
 		lockedMessage = ''
 	}: {
 		questions: Question[];
 		nodeId: string;
+		segmentId?: string | null;
+		blockId?: string | null;
 		passingScore?: number;
 		allowSubmit?: boolean;
 		lockedMessage?: string;
@@ -39,6 +43,8 @@
 		errorMsg = '';
 		const fd = new FormData();
 		fd.set('nodeId', nodeId);
+		if (segmentId) fd.set('segmentId', segmentId);
+		if (blockId) fd.set('blockId', blockId);
 		for (const q of questions) fd.set(q.id, answers[q.id] ?? '');
 		try {
 			const res = await fetch('/api/quiz/grade', { method: 'POST', body: fd });

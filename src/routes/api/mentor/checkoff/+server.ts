@@ -1,4 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { jwtVerify } from 'jose';
+
+const encoder = new TextEncoder();
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const { user, profile } = await locals.safeGetSession();
@@ -6,7 +9,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	const { nodeId, userId, action, notes, checklist_results } = await request.json();
+	const { nodeId, userId, action, notes, checklist_results, qrToken } = await request.json();
 	const normalizedAction = action === 'review' ? 'reset_quiz' : action;
 	if (
 		!nodeId ||
@@ -66,6 +69,21 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	if (profile.role === 'mentor' && user) {
+		if (!qrToken) {
+			return json({ error: 'Mentor must scan student passport QR before checkoff actions.' }, { status: 400 });
+		}
+		try {
+			const { payload } = await jwtVerify(
+				String(qrToken),
+				encoder.encode(process.env.PASSPORT_QR_SECRET ?? 'dev-secret-change-me')
+			);
+			if (String(payload.user_id ?? '') !== String(userId)) {
+				return json({ error: 'Scanned passport does not match selected student.' }, { status: 400 });
+			}
+		} catch {
+			return json({ error: 'Invalid or expired QR token. Rescan student passport.' }, { status: 400 });
+		}
+
 		const [{ data: node }, { data: prefs }] = await Promise.all([
 			locals.supabase.from('nodes').select('subteam_id').eq('id', nodeId).maybeSingle(),
 			locals.supabase
@@ -79,15 +97,68 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		}
 	}
 
-	if (normalizedAction === 'approve' || normalizedAction === 'reset_quiz') {
-		const status = normalizedAction === 'approve' ? 'completed' : 'quiz_pending';
+	if (normalizedAction === 'reset_quiz') {
 		const { error } = await locals.supabase.rpc('transition_certification', {
 			p_node_id: nodeId,
-			p_new_status: status,
+			p_new_status: 'quiz_pending',
 			p_target_user_id: userId,
 			p_mentor_notes: notes ?? null
 		});
 		if (error) return json({ error: error.message }, { status: 400 });
+	}
+
+	if (normalizedAction === 'approve') {
+		const { data: checkoffBlock } = await locals.supabase
+			.from('node_blocks')
+			.select('id')
+			.eq('node_id', nodeId)
+			.eq('type', 'checkoff')
+			.order('position')
+			.limit(1)
+			.maybeSingle();
+
+		if (checkoffBlock?.id) {
+			const { error: progressErr } = await locals.supabase.from('user_node_block_progress').upsert(
+				{
+					user_id: userId,
+					node_id: nodeId,
+					block_id: checkoffBlock.id,
+					completed_at: new Date().toISOString()
+				},
+				{ onConflict: 'user_id,block_id' }
+			);
+			if (progressErr) return json({ error: progressErr.message }, { status: 400 });
+		}
+
+		const { error: reviewErr } = await locals.supabase.from('checkoff_reviews').upsert(
+			{
+				user_id: userId,
+				node_id: nodeId,
+				reviewer_id: user.id,
+				status: 'approved',
+				mentor_notes: String(notes ?? ''),
+				checklist_results: Array.isArray(checklist_results) ? checklist_results : []
+			},
+			{ onConflict: 'user_id,node_id' }
+		);
+		if (reviewErr) return json({ error: reviewErr.message }, { status: 400 });
+
+		if (checkoffBlock?.id) {
+			const { error: autoErr } = await locals.supabase.rpc('try_auto_complete_node', {
+				p_node_id: nodeId,
+				p_target_user_id: userId
+			});
+			if (autoErr) return json({ error: autoErr.message }, { status: 400 });
+		} else {
+			const { error } = await locals.supabase.rpc('transition_certification', {
+				p_node_id: nodeId,
+				p_new_status: 'completed',
+				p_target_user_id: userId,
+				p_mentor_notes: notes ?? null
+			});
+			if (error) return json({ error: error.message }, { status: 400 });
+		}
+		return json({ ok: true });
 	}
 
 	if (normalizedAction === 'retry_checkoff') {

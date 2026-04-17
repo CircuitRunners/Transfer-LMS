@@ -7,12 +7,104 @@
 		correct: string;
 	};
 
+	type VideoConfig = {
+		title: string;
+		video_url: string;
+		start_seconds: number;
+		end_seconds: number | null;
+	};
+
+	type QuizConfig = {
+		title: string;
+		passing_score: number;
+		min_seconds_between_attempts: number;
+		fail_window_minutes: number;
+		max_failed_in_window: number;
+		short_answer_min_chars: number;
+		short_answer_max_chars: number;
+		questions: Question[];
+	};
+
+	type CheckoffConfig = {
+		title: string;
+		directions: string;
+		evidence_mode: 'none' | 'photo_optional' | 'photo_required';
+		mentor_checklist: string[];
+		resource_links: string[];
+	};
+
+	type BlockType = 'video' | 'quiz' | 'checkoff';
+	type Block =
+		| { id?: string; type: 'video'; config: VideoConfig }
+		| { id?: string; type: 'quiz'; config: QuizConfig }
+		| { id?: string; type: 'checkoff'; config: CheckoffConfig };
+
 	let { data, form } = $props();
 
-	let questions = $state<Question[]>(
-		Array.isArray(data.assessment?.questions) ? (data.assessment.questions as Question[]) : []
+	const initialBlocks = $derived<Block[]>(
+		Array.isArray(data.blocks)
+			? (data.blocks as any[]).map((row) => {
+					const cfg = row.config ?? {};
+					if (row.type === 'video') {
+						return {
+							id: row.id,
+							type: 'video',
+							config: {
+								title: String(cfg.title ?? ''),
+								video_url: String(cfg.video_url ?? ''),
+								start_seconds: Number(cfg.start_seconds ?? 0),
+								end_seconds:
+									cfg.end_seconds == null || cfg.end_seconds === '' ? null : Number(cfg.end_seconds)
+							}
+						} as Block;
+					}
+					if (row.type === 'quiz') {
+						return {
+							id: row.id,
+							type: 'quiz',
+							config: {
+								title: String(cfg.title ?? ''),
+								passing_score: Number(cfg.passing_score ?? 80),
+								min_seconds_between_attempts: Number(cfg.min_seconds_between_attempts ?? 15),
+								fail_window_minutes: Number(cfg.fail_window_minutes ?? 10),
+								max_failed_in_window: Number(cfg.max_failed_in_window ?? 5),
+								short_answer_min_chars: Number(cfg.short_answer_min_chars ?? 3),
+								short_answer_max_chars: Number(cfg.short_answer_max_chars ?? 300),
+								questions: Array.isArray(cfg.questions) ? (cfg.questions as Question[]) : []
+							}
+						} as Block;
+					}
+					return {
+						id: row.id,
+						type: 'checkoff',
+						config: {
+							title: String(cfg.title ?? 'Physical checkoff'),
+							directions: String(cfg.directions ?? ''),
+							evidence_mode:
+								cfg.evidence_mode === 'photo_required' || cfg.evidence_mode === 'photo_optional'
+									? cfg.evidence_mode
+									: 'none',
+							mentor_checklist: Array.isArray(cfg.mentor_checklist)
+								? cfg.mentor_checklist.map((v: unknown) => String(v))
+								: [],
+							resource_links: Array.isArray(cfg.resource_links)
+								? cfg.resource_links.map((v: unknown) => String(v))
+								: []
+						}
+					} as Block;
+				})
+			: []
 	);
-	const questionsJson = $derived(JSON.stringify(questions));
+
+	let blocks = $state<Block[]>([]);
+	let expandedIndex = $state<number | null>(null);
+	$effect(() => {
+		blocks = initialBlocks;
+		expandedIndex = initialBlocks.length === 0 ? null : 0;
+	});
+
+	const blocksJson = $derived(JSON.stringify(blocks));
+	const hasCheckoff = $derived(blocks.some((b) => b.type === 'checkoff'));
 
 	let prereqFilter = $state('');
 	const filteredNodes = $derived.by(() => {
@@ -23,45 +115,105 @@
 		);
 	});
 
-	function nextQuestionId(): string {
-		const used = new Set(questions.map((q) => q.id));
-		let i = questions.length + 1;
+	function formatClock(totalSeconds: number | null | undefined): string {
+		const seconds = Math.max(0, Math.trunc(Number(totalSeconds ?? 0)));
+		const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
+		const ss = (seconds % 60).toString().padStart(2, '0');
+		return `${mm}:${ss}`;
+	}
+
+	function parseClock(input: string): number {
+		const cleaned = input.trim();
+		if (!cleaned) return 0;
+		const parts = cleaned.split(':').map((v) => v.trim());
+		if (parts.length === 1) return Math.max(0, Number(parts[0]) || 0);
+		const mm = Math.max(0, Number(parts[0]) || 0);
+		const ss = Math.max(0, Number(parts[1]) || 0);
+		return Math.trunc(mm * 60 + ss);
+	}
+
+	function nextQuestionId(list: Question[]): string {
+		const used = new Set(list.map((q) => q.id));
+		let i = list.length + 1;
 		while (used.has(`q${i}`)) i += 1;
 		return `q${i}`;
 	}
 
-	function addQuestion() {
-		questions.push({
-			id: nextQuestionId(),
-			prompt: '',
-			type: 'mc',
-			options: ['', ''],
-			correct: ''
-		});
+	function addBlock(type: BlockType) {
+		if (type === 'checkoff' && hasCheckoff) return;
+		if (type === 'video') {
+			blocks.push({
+				type: 'video',
+				config: {
+					title: '',
+					video_url: data.node.video_url ?? '',
+					start_seconds: 0,
+					end_seconds: null
+				}
+			});
+		} else if (type === 'quiz') {
+			blocks.push({
+				type: 'quiz',
+				config: {
+					title: '',
+					passing_score: 80,
+					min_seconds_between_attempts: 15,
+					fail_window_minutes: 10,
+					max_failed_in_window: 5,
+					short_answer_min_chars: 3,
+					short_answer_max_chars: 300,
+					questions: []
+				}
+			});
+		} else {
+			blocks.push({
+				type: 'checkoff',
+				config: {
+					title: 'Physical checkoff',
+					directions: '',
+					evidence_mode: 'none',
+					mentor_checklist: [],
+					resource_links: []
+				}
+			});
+		}
+		expandedIndex = blocks.length - 1;
 	}
 
-	function removeQuestion(i: number) {
-		questions.splice(i, 1);
+	function removeBlock(index: number) {
+		blocks.splice(index, 1);
+		if (expandedIndex === index) expandedIndex = null;
+		else if (expandedIndex != null && expandedIndex > index) expandedIndex -= 1;
 	}
 
-	function ensureOptions(q: Question) {
-		if (!Array.isArray(q.options)) q.options = ['', ''];
+	function moveBlock(index: number, direction: -1 | 1) {
+		const next = index + direction;
+		if (next < 0 || next >= blocks.length) return;
+		const copy = [...blocks];
+		const tmp = copy[index];
+		copy[index] = copy[next];
+		copy[next] = tmp;
+		blocks = copy;
+		if (expandedIndex === index) expandedIndex = next;
+		else if (expandedIndex === next) expandedIndex = index;
 	}
 
-	function addOption(i: number) {
-		const q = questions[i];
-		ensureOptions(q);
-		q.options = [...(q.options ?? []), ''];
+	function addQuizQuestion(block: Extract<Block, { type: 'quiz' }>) {
+		block.config.questions = [
+			...block.config.questions,
+			{
+				id: nextQuestionId(block.config.questions),
+				prompt: '',
+				type: 'mc',
+				options: ['', ''],
+				correct: ''
+			}
+		];
 	}
-
-	function removeOption(i: number, oi: number) {
-		const q = questions[i];
-		const removed = (q.options ?? [])[oi];
-		q.options = (q.options ?? []).filter((_, idx) => idx !== oi);
-		if (q.correct && removed !== undefined && q.correct === removed) q.correct = '';
+	function removeQuizQuestion(block: Extract<Block, { type: 'quiz' }>, qIdx: number) {
+		block.config.questions = block.config.questions.filter((_, i) => i !== qIdx);
 	}
-
-	function onTypeChange(q: Question) {
+	function onQuestionTypeChange(q: Question) {
 		if (q.type === 'mc') {
 			if (!Array.isArray(q.options) || q.options.length < 2) q.options = ['', ''];
 			if (!q.options.includes(q.correct)) q.correct = '';
@@ -73,24 +225,57 @@
 		}
 	}
 
-	function warningFor(q: Question): string | null {
-		if (!q.prompt.trim()) return 'Prompt is empty.';
-		if (q.type === 'mc') {
-			const opts = (q.options ?? []).map((o) => o.trim());
-			if (opts.filter(Boolean).length < 2) return 'Add at least two non-empty options.';
-			if (!q.correct) return 'Pick the correct option.';
-			if (!opts.includes(q.correct)) return 'Correct answer must match one of the options.';
-		} else if (q.type === 'tf') {
-			if (q.correct !== 'true' && q.correct !== 'false') return 'Select True or False as the answer.';
-		} else {
-			if (!q.correct.trim()) return 'Short answer needs an expected answer.';
+	function addChecklistItem(block: Extract<Block, { type: 'checkoff' }>) {
+		block.config.mentor_checklist = [...block.config.mentor_checklist, ''];
+	}
+	function removeChecklistItem(block: Extract<Block, { type: 'checkoff' }>, idx: number) {
+		block.config.mentor_checklist = block.config.mentor_checklist.filter((_, i) => i !== idx);
+	}
+	function addResourceLink(block: Extract<Block, { type: 'checkoff' }>) {
+		block.config.resource_links = [...block.config.resource_links, ''];
+	}
+	function removeResourceLink(block: Extract<Block, { type: 'checkoff' }>, idx: number) {
+		block.config.resource_links = block.config.resource_links.filter((_, i) => i !== idx);
+	}
+
+	function blockSummary(block: Block): string {
+		if (block.type === 'video') {
+			const v = block.config;
+			const range =
+				v.end_seconds != null
+					? `${formatClock(v.start_seconds)} – ${formatClock(v.end_seconds)}`
+					: `from ${formatClock(v.start_seconds)}`;
+			return `${v.title || 'Untitled video'} · ${range}`;
 		}
-		return null;
+		if (block.type === 'quiz') {
+			const q = block.config;
+			const count = q.questions.length;
+			return `${q.title || 'Quiz'} · ${count} question${count === 1 ? '' : 's'} · pass ${q.passing_score}%`;
+		}
+		const c = block.config;
+		const evidenceLabel =
+			c.evidence_mode === 'photo_required'
+				? 'photo required'
+				: c.evidence_mode === 'photo_optional'
+					? 'photo optional'
+					: 'no photo';
+		return `${c.title || 'Checkoff'} · ${evidenceLabel}`;
+	}
+
+	function blockStyles(type: BlockType) {
+		if (type === 'video') return 'border-sky-700/60 bg-sky-950/30';
+		if (type === 'quiz') return 'border-yellow-700/60 bg-yellow-950/20';
+		return 'border-emerald-700/60 bg-emerald-950/20';
+	}
+	function blockLabel(type: BlockType) {
+		if (type === 'video') return 'Video';
+		if (type === 'quiz') return 'Quiz';
+		return 'Checkoff';
 	}
 
 	function handleDeleteSubmit(event: SubmitEvent) {
 		const ok = confirm(
-			'Delete this course? Student progress, the quiz, and prerequisites pointing to it will be removed. This cannot be undone.'
+			'Delete this course? Student progress, its blocks, and prerequisites pointing to it will be removed. This cannot be undone.'
 		);
 		if (!ok) event.preventDefault();
 	}
@@ -146,12 +331,7 @@
 		<h2 class="text-lg font-semibold md:col-span-2">Details</h2>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
 			<span class="text-slate-300">Title</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="title"
-				value={data.node.title}
-				required
-			/>
+			<input class="rounded bg-slate-800 px-2 py-2" name="title" value={data.node.title} required />
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-slate-300">Slug</span>
@@ -166,22 +346,8 @@
 			</select>
 		</label>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-slate-300">Video URL</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="video_url"
-				value={data.node.video_url ?? ''}
-			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm md:col-span-2">
-			<span class="text-slate-300">Order</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="ordering"
-				type="number"
-				min="0"
-				value={data.node.ordering}
-			/>
+			<span class="text-slate-300">Fallback video URL (used if no video blocks yet)</span>
+			<input class="rounded bg-slate-800 px-2 py-2" name="video_url" value={data.node.video_url ?? ''} />
 		</label>
 		<label class="flex flex-col gap-1 text-sm md:col-span-2">
 			<span class="text-slate-300">Description</span>
@@ -190,231 +356,277 @@
 			>
 		</label>
 		<div class="flex justify-end md:col-span-2">
-			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900"
-				>Save details</button
-			>
+			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900">
+				Save details
+			</button>
 		</div>
 	</form>
 
 	<form
 		method="POST"
-		action="?/saveAssessment"
-		class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4"
+		action="?/saveBlocks"
+		class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-4"
 	>
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<div>
-				<h2 class="text-lg font-semibold">Quiz</h2>
+				<h2 class="text-lg font-semibold">Course Builder</h2>
 				<p class="text-xs text-slate-400">
-					Author the "Say" assessment. Students must score at or above the passing score.
+					Compose this course from ordered blocks. Students complete each block in sequence.
 				</p>
 			</div>
-			<button
-				type="button"
-				onclick={addQuestion}
-				class="rounded bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">+ Add question</button
-			>
-		</div>
-		<label class="flex max-w-xs flex-col gap-1 text-sm">
-			<span class="text-slate-300">Passing score (%)</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="passing_score"
-				type="number"
-				min="1"
-				max="100"
-				value={data.assessment.passing_score}
-			/>
-		</label>
-		<div class="grid gap-2 md:grid-cols-2">
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Min seconds between attempts</span>
-				<input
-					class="rounded bg-slate-800 px-2 py-2"
-					name="min_seconds_between_attempts"
-					type="number"
-					min="0"
-					max="3600"
-					value={data.assessment.min_seconds_between_attempts ?? 15}
-				/>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Failed-attempt window (minutes)</span>
-				<input
-					class="rounded bg-slate-800 px-2 py-2"
-					name="fail_window_minutes"
-					type="number"
-					min="1"
-					max="1440"
-					value={data.assessment.fail_window_minutes ?? 10}
-				/>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Max failed attempts in window</span>
-				<input
-					class="rounded bg-slate-800 px-2 py-2"
-					name="max_failed_in_window"
-					type="number"
-					min="1"
-					max="200"
-					value={data.assessment.max_failed_in_window ?? 5}
-				/>
-			</label>
-			<div class="rounded border border-slate-800 bg-slate-950/60 p-2 text-xs text-slate-400">
-				Helps prevent rapid guessing while still allowing legitimate retries.
+			<div class="flex flex-wrap gap-2">
+				<button
+					type="button"
+					class="rounded border border-sky-700/60 bg-sky-950/40 px-3 py-1 text-sm hover:bg-sky-900/40"
+					onclick={() => addBlock('video')}
+				>
+					+ Video
+				</button>
+				<button
+					type="button"
+					class="rounded border border-yellow-700/60 bg-yellow-950/40 px-3 py-1 text-sm hover:bg-yellow-900/40"
+					onclick={() => addBlock('quiz')}
+				>
+					+ Quiz
+				</button>
+				<button
+					type="button"
+					class="rounded border border-emerald-700/60 bg-emerald-950/40 px-3 py-1 text-sm hover:bg-emerald-900/40 disabled:opacity-50"
+					disabled={hasCheckoff}
+					onclick={() => addBlock('checkoff')}
+				>
+					+ Checkoff
+				</button>
 			</div>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Short answer min characters</span>
-				<input
-					class="rounded bg-slate-800 px-2 py-2"
-					name="short_answer_min_chars"
-					type="number"
-					min="0"
-					max="5000"
-					value={data.assessment.short_answer_min_chars ?? 3}
-				/>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Short answer max characters</span>
-				<input
-					class="rounded bg-slate-800 px-2 py-2"
-					name="short_answer_max_chars"
-					type="number"
-					min="1"
-					max="5000"
-					value={data.assessment.short_answer_max_chars ?? 300}
-				/>
-			</label>
 		</div>
-		<input type="hidden" name="questions" value={questionsJson} />
-		<div class="space-y-3">
-			{#each questions as q, i (i)}
-				{@const warn = warningFor(q)}
-				<div class="space-y-3 rounded border border-slate-800 bg-slate-950/60 p-3">
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-semibold text-slate-200">Question {i + 1}</span>
-						<button
-							type="button"
-							onclick={() => removeQuestion(i)}
-							class="text-xs text-red-300 hover:text-red-200">Remove</button
-						>
-					</div>
-					<label class="flex flex-col gap-1 text-xs text-slate-400">
-						<span>Prompt</span>
-						<input
-							class="w-full rounded bg-slate-800 px-2 py-2 text-sm text-slate-100"
-							placeholder="What do you want to ask?"
-							bind:value={q.prompt}
-						/>
-					</label>
-					<label class="flex flex-col gap-1 text-xs text-slate-400 md:w-1/2">
-						<span>Question type</span>
-						<select
-							class="rounded bg-slate-800 px-2 py-2 text-sm text-slate-100"
-							bind:value={q.type}
-							onchange={() => onTypeChange(q)}
-						>
-							<option value="mc">Multiple choice</option>
-							<option value="tf">True / False</option>
-							<option value="short">Short answer</option>
-						</select>
-					</label>
+		<input type="hidden" name="blocks_json" value={blocksJson} />
 
-					{#if q.type === 'mc'}
-						<div class="space-y-2">
-							<p class="text-xs text-slate-400">Options</p>
-							<div class="space-y-1">
-								{#each q.options ?? [] as _opt, oi (oi)}
-									<div class="flex items-center gap-2">
-										<input
-											type="radio"
-											name={`correct-${i}`}
-											class="accent-yellow-400"
-											checked={q.correct !== '' && q.correct === q.options![oi]}
-											onchange={() => (q.correct = q.options![oi])}
-											title="Mark as correct answer"
-										/>
-										<input
-											class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm"
-											placeholder={`Option ${oi + 1}`}
-											bind:value={q.options![oi]}
-											oninput={() => {
-												if (q.correct && !q.options!.includes(q.correct)) q.correct = '';
-											}}
-										/>
-										<button
-											type="button"
-											onclick={() => removeOption(i, oi)}
-											class="px-2 text-xs text-slate-400 hover:text-slate-200"
-											aria-label="Remove option">×</button
-										>
-									</div>
-								{/each}
-							</div>
+		<div class="space-y-2">
+			{#each blocks as block, i (block.id ?? i)}
+				<div class="rounded border p-3 {blockStyles(block.type)}">
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="inline-flex items-center rounded bg-slate-900/60 px-2 py-0.5 text-xs font-semibold">
+							{i + 1}. {blockLabel(block.type)}
+						</span>
+						<p class="truncate text-sm text-slate-200">{blockSummary(block)}</p>
+						<div class="ml-auto flex items-center gap-1">
 							<button
 								type="button"
-								onclick={() => addOption(i)}
-								class="text-xs text-slate-300 hover:text-slate-100">+ Add option</button
+								class="rounded border border-slate-700 px-2 py-0.5 text-xs disabled:opacity-40"
+								disabled={i === 0}
+								onclick={() => moveBlock(i, -1)}
+								title="Move up"
+								aria-label="Move up"
+							>▲</button>
+							<button
+								type="button"
+								class="rounded border border-slate-700 px-2 py-0.5 text-xs disabled:opacity-40"
+								disabled={i === blocks.length - 1}
+								onclick={() => moveBlock(i, 1)}
+								title="Move down"
+								aria-label="Move down"
+							>▼</button>
+							<button
+								type="button"
+								class="rounded border border-slate-700 px-2 py-0.5 text-xs"
+								onclick={() => (expandedIndex = expandedIndex === i ? null : i)}
 							>
-							<p class="text-[11px] text-slate-500">
-								The radio marks which option is correct. Click any radio to set or change it.
-							</p>
+								{expandedIndex === i ? 'Collapse' : 'Edit'}
+							</button>
+							<button
+								type="button"
+								class="rounded border border-red-700/60 px-2 py-0.5 text-xs text-red-200"
+								onclick={() => removeBlock(i)}
+							>Remove</button>
 						</div>
-					{:else if q.type === 'tf'}
-						<div class="flex flex-col gap-1 text-xs text-slate-400">
-							<span>Correct answer</span>
-							<div class="inline-flex overflow-hidden rounded border border-slate-700">
-								<button
-									type="button"
-									class={`px-4 py-2 text-sm ${q.correct === 'true' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
-									onclick={() => (q.correct = 'true')}>True</button
-								>
-								<button
-									type="button"
-									class={`px-4 py-2 text-sm ${q.correct === 'false' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
-									onclick={() => (q.correct = 'false')}>False</button
-								>
-							</div>
-						</div>
-					{:else}
-						<label class="flex flex-col gap-1 text-xs text-slate-400">
-							<span>Expected answer</span>
-							<input
-								class="rounded bg-slate-800 px-2 py-2 text-sm text-slate-100"
-								placeholder="e.g. reduce heat"
-								bind:value={q.correct}
-							/>
-							<span class="text-[11px] text-slate-500"
-								>Matched against the student's answer with case-insensitive exact match.</span
-							>
-						</label>
-					{/if}
+					</div>
 
-					{#if warn}
-						<p class="rounded border border-amber-700/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-200">
-							{warn}
-						</p>
+					{#if expandedIndex === i}
+						<div class="mt-3 space-y-3 rounded bg-slate-950/60 p-3">
+							{#if block.type === 'video'}
+								<div class="grid gap-2 md:grid-cols-2">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Title (shown to students)</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="e.g. Intro to Pneumatics" />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>YouTube URL</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.video_url} placeholder="https://www.youtube.com/watch?v=..." />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Start time (mm:ss)</span>
+										<input
+											class="rounded bg-slate-800 px-2 py-2 text-sm"
+											value={formatClock(block.config.start_seconds)}
+											onchange={(e) => (block.config.start_seconds = parseClock((e.currentTarget as HTMLInputElement).value))}
+										/>
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>End time (mm:ss, optional)</span>
+										<input
+											class="rounded bg-slate-800 px-2 py-2 text-sm"
+											placeholder="e.g. 12:30"
+											value={block.config.end_seconds == null ? '' : formatClock(block.config.end_seconds)}
+											onchange={(e) => {
+												const raw = (e.currentTarget as HTMLInputElement).value.trim();
+												block.config.end_seconds = raw ? parseClock(raw) : null;
+											}}
+										/>
+									</label>
+								</div>
+							{:else if block.type === 'quiz'}
+								<div class="grid gap-2 md:grid-cols-2">
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Title</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} placeholder="Quiz name (optional)" />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Passing score (%)</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="100" bind:value={block.config.passing_score} />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Min seconds between attempts</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="0" max="3600" bind:value={block.config.min_seconds_between_attempts} />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Failed-attempt window (minutes)</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="1440" bind:value={block.config.fail_window_minutes} />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Max failed in window</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="200" bind:value={block.config.max_failed_in_window} />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Short answer min / max chars</span>
+										<div class="flex gap-2">
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="0" max="5000" bind:value={block.config.short_answer_min_chars} />
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" type="number" min="1" max="5000" bind:value={block.config.short_answer_max_chars} />
+										</div>
+									</label>
+								</div>
+
+								<div class="space-y-2">
+									<div class="flex items-center justify-between">
+										<p class="text-xs font-semibold text-slate-300">Questions</p>
+										<button type="button" class="rounded border border-slate-700 px-2 py-1 text-xs" onclick={() => addQuizQuestion(block)}>+ Add question</button>
+									</div>
+									{#each block.config.questions as q, qIdx (qIdx)}
+										<div class="space-y-2 rounded border border-slate-800 bg-slate-900/60 p-2">
+											<div class="flex items-center justify-between">
+												<span class="text-xs text-slate-400">Q{qIdx + 1}</span>
+												<button type="button" class="text-xs text-red-300" onclick={() => removeQuizQuestion(block, qIdx)}>Remove</button>
+											</div>
+											<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" placeholder="Question prompt" bind:value={q.prompt} />
+											<div class="flex items-center gap-2">
+												<select class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={q.type} onchange={() => onQuestionTypeChange(q)}>
+													<option value="mc">Multiple choice</option>
+													<option value="tf">True / False</option>
+													<option value="short">Short answer</option>
+												</select>
+											</div>
+											{#if q.type === 'mc'}
+												<div class="space-y-1">
+													{#each q.options ?? [] as _opt, oi (oi)}
+														<div class="flex items-center gap-2">
+															<input
+																type="radio"
+																name={`correct-${i}-${qIdx}`}
+																checked={q.correct !== '' && q.correct === q.options![oi]}
+																onchange={() => (q.correct = q.options![oi])}
+															/>
+															<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" placeholder={`Option ${oi + 1}`} bind:value={q.options![oi]} />
+														</div>
+													{/each}
+													<div class="flex gap-2 pt-1">
+														<button type="button" class="rounded border border-slate-700 px-2 py-0.5 text-xs" onclick={() => (q.options = [...(q.options ?? []), ''])}>+ Option</button>
+													</div>
+												</div>
+											{:else if q.type === 'tf'}
+												<div class="inline-flex overflow-hidden rounded border border-slate-700">
+													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'true' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200'}`} onclick={() => (q.correct = 'true')}>True</button>
+													<button type="button" class={`px-4 py-1 text-sm ${q.correct === 'false' ? 'bg-yellow-400 text-slate-900' : 'bg-slate-800 text-slate-200'}`} onclick={() => (q.correct = 'false')}>False</button>
+												</div>
+											{:else}
+												<input class="w-full rounded bg-slate-800 px-2 py-2 text-sm" placeholder="Expected answer" bind:value={q.correct} />
+											{/if}
+										</div>
+									{:else}
+										<p class="text-xs text-slate-500">No questions yet.</p>
+									{/each}
+								</div>
+							{:else}
+								<div class="grid gap-2 md:grid-cols-2">
+									<label class="flex flex-col gap-1 text-xs text-slate-400 md:col-span-2">
+										<span>Section title</span>
+										<input class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.title} />
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400 md:col-span-2">
+										<span>Student directions</span>
+										<textarea class="rounded bg-slate-800 px-2 py-2 text-sm" rows="3" bind:value={block.config.directions} placeholder="Explain exactly what they must demo or submit..."></textarea>
+									</label>
+									<label class="flex flex-col gap-1 text-xs text-slate-400">
+										<span>Photo evidence</span>
+										<select class="rounded bg-slate-800 px-2 py-2 text-sm" bind:value={block.config.evidence_mode}>
+											<option value="none">No photo</option>
+											<option value="photo_optional">Photo optional</option>
+											<option value="photo_required">Photo required</option>
+										</select>
+									</label>
+								</div>
+
+								<div class="grid gap-3 md:grid-cols-2">
+									<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
+										<div class="mb-1 flex items-center justify-between">
+											<p class="text-xs font-semibold text-slate-300">Mentor checklist</p>
+											<button type="button" class="rounded border border-slate-700 px-2 py-0.5 text-xs" onclick={() => addChecklistItem(block)}>+ Item</button>
+										</div>
+										{#each block.config.mentor_checklist as _item, idx (idx)}
+											<div class="flex items-center gap-1">
+												<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" bind:value={block.config.mentor_checklist[idx]} placeholder="e.g. Safety glasses worn" />
+												<button type="button" class="px-2 text-xs text-red-300" onclick={() => removeChecklistItem(block, idx)}>×</button>
+											</div>
+										{:else}
+											<p class="text-xs text-slate-500">No checklist items yet.</p>
+										{/each}
+									</div>
+									<div class="rounded border border-slate-800 bg-slate-900/60 p-2">
+										<div class="mb-1 flex items-center justify-between">
+											<p class="text-xs font-semibold text-slate-300">Resource links</p>
+											<button type="button" class="rounded border border-slate-700 px-2 py-0.5 text-xs" onclick={() => addResourceLink(block)}>+ Link</button>
+										</div>
+										{#each block.config.resource_links as _link, idx (idx)}
+											<div class="flex items-center gap-1">
+												<input class="flex-1 rounded bg-slate-800 px-2 py-1 text-sm" bind:value={block.config.resource_links[idx]} placeholder="https://..." />
+												<button type="button" class="px-2 text-xs text-red-300" onclick={() => removeResourceLink(block, idx)}>×</button>
+											</div>
+										{:else}
+											<p class="text-xs text-slate-500">No links yet.</p>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
 					{/if}
 				</div>
 			{:else}
-				<p class="text-sm text-slate-400">No questions yet. Click "Add question" to start.</p>
+				<div class="rounded border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
+					No blocks yet. Use the buttons above to add a video, quiz, or checkoff.
+				</div>
 			{/each}
 		</div>
+
 		<div class="flex justify-end">
-			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900"
-				>Save quiz</button
-			>
+			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900">
+				Save course
+			</button>
 		</div>
 	</form>
 
-	<form
-		method="POST"
-		action="?/savePrereqs"
-		class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4"
-	>
+	<form method="POST" action="?/savePrereqs" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
 		<div>
 			<h2 class="text-lg font-semibold">Prerequisites</h2>
 			<p class="text-xs text-slate-400">
-				Select courses that students must complete before starting this one.
+				Students must complete these courses before starting this one.
 			</p>
 		</div>
 		<input
@@ -424,15 +636,8 @@
 		/>
 		<div class="grid max-h-80 gap-1 overflow-y-auto md:grid-cols-2">
 			{#each filteredNodes as n (n.id)}
-				<label
-					class="flex items-center gap-2 rounded border border-slate-800 px-2 py-1 text-sm hover:bg-slate-800/50"
-				>
-					<input
-						type="checkbox"
-						name="prereq_ids"
-						value={n.id}
-						checked={data.prereqIds.includes(n.id)}
-					/>
+				<label class="flex items-center gap-2 rounded border border-slate-800 px-2 py-1 text-sm hover:bg-slate-800/50">
+					<input type="checkbox" name="prereq_ids" value={n.id} checked={data.prereqIds.includes(n.id)} />
 					<span class="truncate">{n.title}</span>
 					<span class="ml-auto text-xs text-slate-500">{n.slug}</span>
 				</label>
@@ -441,76 +646,9 @@
 			{/each}
 		</div>
 		<div class="flex justify-end">
-			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900"
-				>Save prerequisites</button
-			>
-		</div>
-	</form>
-
-	<form
-		method="POST"
-		action="?/saveCheckoff"
-		class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4"
-	>
-		<div>
-			<h2 class="text-lg font-semibold">Physical Checkoff Section</h2>
-			<p class="text-xs text-slate-400">
-				This appears under the quiz and drives what mentors verify before approval.
-			</p>
-		</div>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-slate-300">Section title</span>
-			<input
-				class="rounded bg-slate-800 px-2 py-2"
-				name="checkoff_title"
-				value={data.checkoff.title ?? 'Physical checkoff'}
-			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-slate-300">Student directions</span>
-			<textarea
-				class="rounded bg-slate-800 px-2 py-2"
-				name="checkoff_directions"
-				rows="3"
-				placeholder="Detailed steps for student demo/evidence submission..."
-			>{data.checkoff.directions ?? ''}</textarea>
-		</label>
-		<div class="grid gap-2 md:grid-cols-2">
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Mentor checklist (one item per line)</span>
-				<textarea
-					class="rounded bg-slate-800 px-2 py-2"
-					name="mentor_checklist_text"
-					rows="4"
-					placeholder="- Check safety\n- Verify process"
-				>{(data.checkoff.mentor_checklist ?? []).join('\n')}</textarea>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-slate-300">Resource links (one URL per line)</span>
-				<textarea
-					class="rounded bg-slate-800 px-2 py-2"
-					name="resource_links_text"
-					rows="4"
-					placeholder="https://... reference doc or rubric"
-				>{(data.checkoff.resource_links ?? []).join('\n')}</textarea>
-			</label>
-		</div>
-		<label class="flex flex-col gap-1 text-sm md:w-80">
-			<span class="text-slate-300">Photo evidence requirement</span>
-			<select name="evidence_mode" class="rounded bg-slate-800 px-2 py-2">
-				<option value="none" selected={data.checkoff.evidence_mode === 'none'}>No photo</option>
-				<option value="photo_optional" selected={data.checkoff.evidence_mode === 'photo_optional'}
-					>Photo optional</option
-				>
-				<option value="photo_required" selected={data.checkoff.evidence_mode === 'photo_required'}
-					>Photo required</option
-				>
-			</select>
-		</label>
-		<div class="flex justify-end">
-			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900"
-				>Save checkoff section</button
-			>
+			<button class="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900">
+				Save prerequisites
+			</button>
 		</div>
 	</form>
 </section>
