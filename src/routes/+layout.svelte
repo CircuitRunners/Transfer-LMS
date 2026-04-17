@@ -60,8 +60,8 @@
 				<a href="/passport" class={page.url.pathname === '/passport' ? 'text-yellow-300' : ''}
 					>Passport</a
 				>
-				<a href="/machines" class={page.url.pathname.startsWith('/machines') ? 'text-yellow-300' : ''}
-					>Machines</a
+				<a href="/scan" class={page.url.pathname.startsWith('/scan') ? 'text-yellow-300' : ''}
+					>Scan</a
 				>
 				{#if data.session}
 					<form method="POST" action="/auth/signout">

@@ -191,9 +191,9 @@
 		<h1 class="text-2xl font-semibold">Pending Checkoffs</h1>
 		<div class="flex items-center gap-2">
 			<a
-				href="/mentor/machines"
+				href="/scan"
 				class="rounded border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800"
-				>Machine shop</a
+				>Scan hub</a
 			>
 			<a
 				href="/mentor/courses"

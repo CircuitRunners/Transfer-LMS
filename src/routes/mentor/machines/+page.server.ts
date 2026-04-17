@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	for (const machine of machines ?? []) {
 		const token = String((machine as any).qr_token ?? '');
 		if (!token) continue;
-		const url = `${host}/machines?machine=${encodeURIComponent(token)}`;
+		const url = `${host}/scan?machine=${encodeURIComponent(token)}`;
 		qrByToken.set(token, await QRCode.toDataURL(url));
 	}
 
