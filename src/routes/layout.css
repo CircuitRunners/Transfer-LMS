@@ -6,6 +6,13 @@ body {
 }
 
 body {
-	overflow: hidden;
-	overscroll-behavior-y: none;
+	overflow-y: auto;
+	overscroll-behavior-y: auto;
+}
+
+@media (min-width: 768px) {
+	body {
+		overflow: hidden;
+		overscroll-behavior-y: none;
+	}
 }

@@ -48,10 +48,10 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<div class="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
+<div class="flex min-h-dvh bg-slate-950 text-slate-100 md:h-screen md:overflow-hidden">
 	<!-- Sidebar -->
 	<aside
-		class={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-700 bg-slate-900 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+		class={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-700 bg-slate-900 pb-[env(safe-area-inset-bottom)] transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0 md:pb-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
 	>
 		<div class="flex items-center justify-between border-b border-slate-700 px-5 py-5">
 			<a href="/dashboard" class="block leading-tight">
@@ -131,11 +131,12 @@
 			{/if}
 		</nav>
 
-		{#if data.session && data.profile}
+		{#if data.user && data.profile}
 			<div class="border-t border-slate-700 p-3">
 				<a
 					href="/profile"
-					class="flex items-center gap-3 rounded-md p-2 hover:bg-slate-800"
+					onclick={() => (mobileOpen = false)}
+					class="touch-manipulation flex items-center gap-3 rounded-md p-2 hover:bg-slate-800"
 				>
 					<Avatar
 						name={data.profile.full_name}
@@ -175,7 +176,7 @@
 		></button>
 	{/if}
 
-	<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+	<div class="flex min-h-dvh min-w-0 flex-1 flex-col md:min-h-0">
 		<!-- Mobile top bar -->
 		<header
 			class="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-3 md:hidden"
@@ -194,9 +195,9 @@
 					/></svg
 				>
 			</button>
-			<p class="text-sm font-semibold">Transfer · {data.orgName}</p>
+			<p class="min-w-0 flex-1 px-3 text-center text-sm font-semibold truncate">Transfer · {data.orgName}</p>
 			{#if data.profile}
-				<a href="/profile">
+				<a href="/profile" class="touch-manipulation shrink-0 rounded p-0.5">
 					<Avatar
 						name={data.profile.full_name}
 						email={data.profile.email}
@@ -209,7 +210,7 @@
 			{/if}
 		</header>
 
-		<main class="min-h-0 flex-1 overflow-y-auto bg-slate-950 px-6 py-8 md:px-10 md:py-10">
+		<main class="flex-1 bg-slate-950 px-6 py-8 md:min-h-0 md:overflow-y-auto md:px-10 md:py-10">
 			<div class="mx-auto w-full max-w-6xl">
 				{@render children()}
 			</div>

@@ -1,11 +1,26 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 
+const normalizeMachineToken = (value: unknown) => {
+	const raw = String(value ?? '').trim();
+	if (!raw) return '';
+
+	try {
+		const parsed = new URL(raw, 'http://localhost');
+		const fromQuery = parsed.searchParams.get('machine');
+		if (fromQuery) return fromQuery.trim();
+	} catch {
+		// Fallback to raw string if not URL-shaped.
+	}
+
+	return raw;
+};
+
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const { user } = await locals.safeGetSession();
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const body = await request.json().catch(() => null);
-	const machineToken = String(body?.machineToken ?? '').trim();
+	const machineToken = normalizeMachineToken(body?.machineToken);
 	if (!machineToken) return json({ error: 'Machine QR token is required.' }, { status: 400 });
 
 	const { data: machine } = await locals.supabase

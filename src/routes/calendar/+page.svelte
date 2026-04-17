@@ -39,6 +39,18 @@
 		rows.push(row);
 		return rows;
 	});
+	const mobileWeekGroups = $derived.by(() => {
+		return calendarRows
+			.map((row, index) => {
+				const dates = row.filter((iso): iso is string => Boolean(iso));
+				if (dates.length === 0) return null;
+				const start = dates[0];
+				const end = dates[dates.length - 1];
+				const title = index === 0 ? 'This week' : index === 1 ? 'Next week' : `Week ${index + 1}`;
+				return { title, start, end, dates };
+			})
+			.filter((group): group is { title: string; start: string; end: string; dates: string[] } => Boolean(group));
+	});
 
 	const fmt = (iso: string) => {
 		const d = new Date(iso + 'T00:00:00');
@@ -49,6 +61,12 @@
 			isToday: iso === new Date().toISOString().slice(0, 10),
 			isWeekend: [0, 6].includes(d.getDay())
 		};
+	};
+	const weekRangeLabel = (startIso: string, endIso: string) => {
+		const start = fmt(startIso);
+		const end = fmt(endIso);
+		if (startIso === endIso) return `${start.month} ${start.day}`;
+		return `${start.month} ${start.day} - ${end.month} ${end.day}`;
 	};
 
 	const setScope = (scope: 'me' | 'team' | 'all') => {
@@ -137,7 +155,55 @@
 	</header>
 
 	{#if data.scope === 'me'}
-		<div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-sm">
+		<div class="space-y-3 md:hidden">
+			{#each mobileWeekGroups as week (week.title)}
+				<div class="rounded-xl border border-slate-700 bg-slate-900 p-3">
+					<div class="mb-3 border-b border-slate-800 pb-2">
+						<p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{week.title}</p>
+						<p class="mt-1 text-sm text-slate-300">{weekRangeLabel(week.start, week.end)}</p>
+					</div>
+					<div class="space-y-2.5">
+						{#each week.dates as iso (iso)}
+							{@const m = fmt(iso)}
+							<div class={`rounded-lg border p-2.5 ${m.isWeekend ? 'border-slate-700 bg-slate-900/70' : 'border-slate-700 bg-slate-900/40'}`}>
+								<div class="mb-2 flex items-center justify-between">
+									<p class="text-sm font-semibold text-slate-100">
+										{m.weekday}, {m.month} {m.day}
+									</p>
+									{#if m.isToday}
+										<span class="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+											Today
+										</span>
+									{/if}
+								</div>
+								<div class="grid gap-2">
+									{#each shifts as shift (shift.n)}
+										{@const key = `${iso}|${shift.n}`}
+										{@const on = mineSet.has(key)}
+										<button
+											type="button"
+											onclick={() => toggle(iso, shift.n, on)}
+											class={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+												on
+													? 'border-slate-600 bg-slate-700 text-white'
+													: 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
+											}`}
+										>
+											<span class="block font-medium">{shift.label}</span>
+											<span class={`block text-xs ${on ? 'text-white/75' : 'text-slate-500'}`}>
+												{on ? 'Available' : 'Tap to opt in'}
+											</span>
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+		<div class="hidden overflow-x-auto rounded-xl border border-slate-700 bg-slate-900 shadow-sm md:block">
+			<div class="min-w-[700px]">
 			<div class="grid grid-cols-7 border-b border-slate-700 bg-slate-800/70 text-[11px] font-medium uppercase tracking-wider text-slate-300">
 				{#each weekdayLabels as day (day)}
 					<div class="px-3 py-2 text-center">{day}</div>
@@ -187,10 +253,95 @@
 					</div>
 				{/each}
 			</div>
+			</div>
 		</div>
 	{:else}
 		<div class="space-y-4">
-			<div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-sm">
+			<div class="space-y-3 md:hidden">
+				{#each mobileWeekGroups as week (week.title)}
+					<div class="rounded-xl border border-slate-700 bg-slate-900 p-3">
+						<div class="mb-3 border-b border-slate-800 pb-2">
+							<p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{week.title}</p>
+							<p class="mt-1 text-sm text-slate-300">{weekRangeLabel(week.start, week.end)}</p>
+						</div>
+						<div class="space-y-2.5">
+							{#each week.dates as iso (iso)}
+								{@const m = fmt(iso)}
+								<div class={`rounded-lg border p-2.5 ${m.isWeekend ? 'border-slate-700 bg-slate-900/70' : 'border-slate-700 bg-slate-900/40'}`}>
+									<div class="mb-2 flex items-center justify-between">
+										<p class="text-sm font-semibold text-slate-100">
+											{m.weekday}, {m.month} {m.day}
+										</p>
+										{#if m.isToday}
+											<span class="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+												Today
+											</span>
+										{/if}
+									</div>
+									<div class="space-y-2">
+										{#each shifts as shift (shift.n)}
+											{@const key = `${iso}|${shift.n}`}
+											{@const ids = data.rosterByKey[key] ?? []}
+											{@const mineOn = mineSet.has(key)}
+											<div class="w-full rounded-md border border-slate-700 bg-slate-800/40 p-2 text-left">
+												<div class="flex items-center justify-between">
+													<p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+														{shift.label}
+													</p>
+													<span class="text-xs font-medium text-slate-100">{ids.length}</span>
+												</div>
+												{#if ids.length === 0}
+													<p class="mt-1 text-xs text-slate-500">No one yet</p>
+												{:else}
+													<div class="mt-1.5 flex flex-wrap gap-1">
+														{#each ids.slice(0, 10) as uid (uid)}
+															{@const p = rosterMap.get(uid)}
+															{#if p}
+																<Avatar
+																	name={p.full_name}
+																	email={p.email}
+																	url={p.avatar_url}
+																	size="xs"
+																	ring={isMentor(p)}
+																	ringClass="ring-sky-400"
+																	title={p.full_name || p.email}
+																/>
+															{/if}
+														{/each}
+														{#if ids.length > 10}
+															<span class="text-xs text-slate-400">+{ids.length - 10}</span>
+														{/if}
+													</div>
+												{/if}
+												<div class="mt-2 flex gap-1.5">
+													{#if data.scope === 'all'}
+														<button
+															type="button"
+															class="flex-1 rounded border border-slate-700 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+															onclick={() => openShift(iso, shift.n)}
+														>
+															View list
+														</button>
+													{/if}
+													<button
+														type="button"
+														class="flex-1 rounded border border-slate-700 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+														onclick={() => toggle(iso, shift.n, mineOn)}
+													>
+														{mineOn ? 'Leave' : 'Add me'}
+													</button>
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+			<div class="hidden overflow-x-auto rounded-xl border border-slate-700 bg-slate-900 shadow-sm md:block">
+				<div class="min-w-[700px]">
 				<div class="grid grid-cols-7 border-b border-slate-700 bg-slate-800/70 text-[11px] font-medium uppercase tracking-wider text-slate-300">
 					{#each weekdayLabels as day (day)}
 						<div class="px-3 py-2 text-center">{day}</div>
@@ -275,6 +426,7 @@
 							{/each}
 						</div>
 					{/each}
+				</div>
 				</div>
 			</div>
 
